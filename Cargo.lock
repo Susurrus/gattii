@@ -2,9 +2,15 @@
 name = "gattii"
 version = "0.1.0"
 dependencies = [
+ "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gtk 0.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serial 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "argparse"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "atk-sys"

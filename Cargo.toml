@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Bryant Mairs <bryant@mai.rs>"]
 
 [dependencies]
+argparse = "0.2"
 gtk = "0.0.7"
 serial = "0.3"
