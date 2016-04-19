@@ -81,6 +81,17 @@ fn main() {
     let ports_selector_container = gtk::ToolItem::new();
     ports_selector_container.add(&ports_selector);
     toolbar.add(&ports_selector_container);
+    let baud_selector = gtk::ComboBoxText::new();
+    baud_selector.append(None, "921600");
+    baud_selector.append(None, "115200");
+    baud_selector.append(None, "57600");
+    baud_selector.append(None, "38400");
+    baud_selector.append(None, "19200");
+    baud_selector.append(None, "9600");
+    baud_selector.set_active(1);
+    let baud_selector_container = gtk::ToolItem::new();
+    baud_selector_container.add(&baud_selector);
+    toolbar.add(&baud_selector_container);
     let open_icon = gtk::Image::new_from_icon_name("media-playback-start",
                                                    gtk::IconSize::SmallToolbar as i32);
     let open_button = gtk::ToolButton::new::<gtk::Image>(Some(&open_icon), None);
