@@ -14,10 +14,44 @@ use gtk::prelude::*;
 use serial::BaudRate;
 use serial::prelude::*;
 
+#[derive(Debug)]
 enum ExitCode {
     ArgumentError = 1,
     BadPort,
     ConfigurationError
+}
+
+#[derive(Debug)]
+pub struct Error {
+    code: ExitCode,
+    description: String
+}
+
+fn open_port(port_name: String, baud_rate: String) -> Result<serial::SystemPort, ::Error> {
+    // Convert arguments to numbers
+    let baud : usize = match baud_rate.parse() {
+        Ok(t) => t,
+        Err(_) => return Err(Error { code: ExitCode::ArgumentError, description: format!("Improper serial baud rate specified ({})", baud_rate) })
+    };
+
+    // Open the specified serial port
+    let mut port = match serial::open(&port_name) {
+        Ok(m) => { m }
+        Err(e) => return Err(Error { code: ExitCode::BadPort, description: format!("Failed to open {}: {}", port_name, e.to_string()) })
+    };
+
+    // Configure the port settings
+    match port.reconfigure(&|settings| {
+        try!(settings.set_baud_rate(BaudRate::from_speed(baud)));
+        settings.set_char_size(serial::Bits8);
+        settings.set_parity(serial::ParityNone);
+        settings.set_stop_bits(serial::Stop1);
+        settings.set_flow_control(serial::FlowNone);
+        Ok(())
+    }) {
+        Ok(_) => Ok(port),
+        Err(e) => Err(Error { code: ExitCode::ConfigurationError, description: format!("Failed to configure {}: {}", port_name, e.to_string()) })
+    }
 }
 
 fn main() {
@@ -37,31 +71,18 @@ fn main() {
     }
 
     // Process any command line arguments that were passed
+    let port: serial::SystemPort;
     if serial_port_name.len() > 0 && serial_baud.len() > 0 {
-        // Convert arguments to numbers
-        let baud : usize = match serial_baud.parse() {
-            Ok(t) => t,
-            Err(_) => { println!("Improper serial baud rate specified ({})", serial_baud); process::exit(ExitCode::ArgumentError as i32)}
-        };
-
-        // Open the specified serial port
-        let mut port = match serial::open(&serial_port_name) {
-            Ok(m) => { m }
-            Err(e) => { println!("Failed to open {}: {}", serial_port_name, e.to_string()); process::exit(ExitCode::BadPort as i32)}
-        };
-
-        // Configure the port settings
-        match port.reconfigure(&|settings| {
-            try!(settings.set_baud_rate(BaudRate::from_speed(baud)));
-            settings.set_char_size(serial::Bits8);
-            settings.set_parity(serial::ParityNone);
-            settings.set_stop_bits(serial::Stop1);
-            settings.set_flow_control(serial::FlowNone);
-            Ok(())
-        }) {
-            Ok(_) => (),
-            Err(e) => { println!("Failed to configure {}: {}", serial_port_name, e.to_string()); process::exit(ExitCode::ConfigurationError as i32)}
+        match open_port(serial_port_name, serial_baud) {
+            Ok(p) => port = p,
+            Err(e) => { println!("{}", e.description); process::exit(e.code as i32)}
         }
+    } else if serial_port_name.len() > 0 {
+        println!("A baud rate must be specified as well.");
+        process::exit(ExitCode::ArgumentError as i32);
+    } else if serial_baud.len() > 0 {
+        println!("A port name must be specified as well.");
+        process::exit(ExitCode::ArgumentError as i32);
     }
 
     if gtk::init().is_err() {
