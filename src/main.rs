@@ -4,9 +4,6 @@ extern crate argparse;
 extern crate gtk;
 extern crate serial;
 
-use std::io::prelude::*;
-use std::fs::File;
-use std::io::BufReader;
 use std::process;
 
 use argparse::{ArgumentParser, Store};
@@ -134,27 +131,15 @@ fn main() {
     vbox.pack_start(&scroll, true, true, 0);
     window.add(&vbox);
 
-    let window1 = window.clone();
     open_button.connect_clicked(move |_| {
-        // TODO move this to a impl?
-        let file_chooser = gtk::FileChooserDialog::new(
-            Some("Open File"), Some(&window1), gtk::FileChooserAction::Open);
-        file_chooser.add_buttons(&[
-            ("Open", gtk::ResponseType::Ok as i32),
-            ("Cancel", gtk::ResponseType::Cancel as i32),
-        ]);
-        if file_chooser.run() == gtk::ResponseType::Ok as i32 {
-            let filename = file_chooser.get_filename().unwrap();
-            let file = File::open(&filename).unwrap();
-
-            let mut reader = BufReader::new(file);
-            let mut contents = String::new();
-            let _ = reader.read_to_string(&mut contents);
-
-            text_view.get_buffer().unwrap().set_text(&contents);
+        if let Some(port_name) = ports_selector.get_active_text() {
+            if let Some(baud_rate) = baud_selector.get_active_text() {
+                match open_port(port_name, baud_rate) {
+                    Ok(_) => (),
+                    Err(e) => println!("{}", e.description)
+                }
+            }
         }
-
-        file_chooser.destroy();
     });
 
     window.connect_delete_event(|_, _| {
