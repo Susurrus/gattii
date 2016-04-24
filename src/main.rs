@@ -96,8 +96,16 @@ fn main() {
     // Create a toolbar with the basic options in it
     let toolbar = gtk::Toolbar::new();
     let ports_selector = gtk::ComboBoxText::new();
-    ports_selector.append(None, "/dev/ttyUSB0");
-    ports_selector.set_active(0);
+    if let Ok(ports) = serial::list_ports() {
+        for p in ports {
+            ports_selector.append(None, &p.port_name);
+        }
+        ports_selector.set_active(0);
+    } else {
+        ports_selector.append(None, "No ports found");
+        ports_selector.set_active(0);
+        ports_selector.set_sensitive(false);
+    }
     let ports_selector_container = gtk::ToolItem::new();
     ports_selector_container.add(&ports_selector);
     toolbar.add(&ports_selector_container);
