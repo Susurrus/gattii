@@ -120,9 +120,9 @@ fn main() {
     let baud_selector_container = gtk::ToolItem::new();
     baud_selector_container.add(&baud_selector);
     toolbar.add(&baud_selector_container);
-    let open_icon = gtk::Image::new_from_icon_name("media-playback-start",
-                                                   gtk::IconSize::SmallToolbar as i32);
-    let open_button = gtk::ToolButton::new::<gtk::Image>(Some(&open_icon), None);
+
+    let open_button = gtk::ToggleToolButton::new();
+    open_button.set_icon_name(Some("media-playback-start"));
     open_button.set_is_important(true);
     toolbar.add(&open_button);
 
@@ -139,12 +139,13 @@ fn main() {
     vbox.pack_start(&scroll, true, true, 0);
     window.add(&vbox);
 
-    open_button.connect_clicked(move |_| {
-        if let Some(port_name) = ports_selector.get_active_text() {
-            if let Some(baud_rate) = baud_selector.get_active_text() {
-                match open_port(port_name, baud_rate) {
-                    Ok(_) => (),
-                    Err(e) => println!("{}", e.description)
+    open_button.connect_clicked(move |s| {
+        if s.get_active() {
+            if let Some(port_name) = ports_selector.get_active_text() {
+                if let Some(baud_rate) = baud_selector.get_active_text() {
+                    if let Err(e) = open_port(port_name, baud_rate) {
+                        println!("{}", e.description)
+                    }
                 }
             }
         }
