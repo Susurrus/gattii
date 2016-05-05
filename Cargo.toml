@@ -1,7 +1,12 @@
 [package]
 name = "gattii"
 version = "0.1.0"
+license = "GPL-3.0"
 authors = ["Bryant Mairs <bryant@mai.rs>"]
+description = "Rust program for reading data from serial ports."
+repository = "https://gitlab.com/susurrus/gattii"
+readme = "README.rst"
+keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 
 [dependencies]
 argparse = "0.2"
