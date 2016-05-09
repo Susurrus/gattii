@@ -128,6 +128,7 @@ fn main() {
 
     // Set up an auto-scrolling text view
     let text_view = gtk::TextView::new();
+    text_view.set_wrap_mode(gtk::WrapMode::Char);
     text_view.set_editable(false);
     let scroll = gtk::ScrolledWindow::new(None, None);
     scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
