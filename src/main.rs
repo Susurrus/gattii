@@ -134,6 +134,13 @@ fn main() {
     scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scroll.add(&text_view);
 
+    let css_style_provider = gtk::CssProvider::new();
+    //let style = "GtkTextView { font: Monospace 11 }";
+    //css_style_provider.load_from_data(style); // TODO: Enable instead of 146 once https://github.com/gtk-rs/gtk/issues/332 is fixed
+    css_style_provider.load_from_path("style.css").unwrap();
+    let text_view_style_context = text_view.get_style_context().unwrap();
+    text_view_style_context.add_provider(&css_style_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION as u32); // TODO: Remove once https://github.com/gtk-rs/gtk/issues/333 is fixed
+
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
     vbox.pack_start(&toolbar, false, true, 0);
