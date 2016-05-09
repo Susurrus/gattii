@@ -2,9 +2,14 @@
 
 extern crate argparse;
 extern crate gtk;
+extern crate glib;
 extern crate serial;
 
+use std::cell::RefCell;
 use std::process;
+use std::sync::mpsc::{channel, Receiver};
+use std::thread;
+use std::time::Duration;
 
 use argparse::{ArgumentParser, Store};
 use gtk::prelude::*;
@@ -25,6 +30,7 @@ pub struct Error {
 }
 
 fn open_port(port_name: String, baud_rate: String) -> Result<serial::SystemPort, ::Error> {
+    println!("Opening port '{}' at {}", port_name, baud_rate);
     // Convert arguments to numbers
     let baud : usize = match baud_rate.parse() {
         Ok(t) => t,
@@ -159,6 +165,24 @@ fn main() {
         }
     });
 
+    let (tx, rx) = channel();
+    // put TextBuffer and receiver in thread local storage
+    GLOBAL.with(move |global| {
+        *global.borrow_mut() = Some((text_view.get_buffer().unwrap(), rx))
+    });
+
+    // Start an example thread to feed data to the GUI thread
+    thread::spawn(move|| {
+        for i in 1..100 {
+            // do long work
+            thread::sleep(Duration::from_millis(50));
+            // send result to channel
+            tx.send(format!("#{:02} Text from another thread.", i)).unwrap();
+            // receive will be run on the main thread
+            glib::idle_add(receive);
+        }
+    });
+
     window.connect_delete_event(|_, _| {
         gtk::main_quit();
         Inhibit(false)
@@ -167,3 +191,20 @@ fn main() {
     window.show_all();
     gtk::main();
 }
+
+fn receive() -> glib::Continue {
+    GLOBAL.with(|global| {
+        if let Some((ref buf, ref rx)) = *global.borrow() {
+            if let Ok(text) = rx.try_recv() {
+                let mut end = buf.get_end_iter();
+                buf.insert(&mut end, &text);
+            }
+        }
+    });
+    glib::Continue(false)
+}
+
+// declare a new thread local storage key
+thread_local!(
+    static GLOBAL: RefCell<Option<(gtk::TextBuffer, Receiver<String>)>> = RefCell::new(None)
+);
