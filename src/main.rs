@@ -156,7 +156,7 @@ fn main() {
     let style = "GtkTextView { font: Monospace 11 }";
     css_style_provider.load_from_data(style).unwrap();
     let text_view_style_context = text_view.get_style_context().unwrap();
-    text_view_style_context.add_provider(&css_style_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION as u32); // TODO: Remove once https://github.com/gtk-rs/gtk/issues/333 is fixed
+    text_view_style_context.add_provider(&css_style_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
