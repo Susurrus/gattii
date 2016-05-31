@@ -305,7 +305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "serial"
 version = "0.3.3"
-source = "git+https://github.com/susurrus/serial-rs#9f36b2f5d0bd18971728d232a366f64beb2fba94"
+source = "git+https://github.com/susurrus/serial-rs#340345ef23bfad94ba3b4557b765bab3fc14d113"
 dependencies = [
  "ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,15 +1,21 @@
 #![crate_type = "bin"]
 
 extern crate argparse;
+extern crate core;
 extern crate gtk;
 extern crate glib;
 extern crate serial;
 
+use core::num;
+use std::boxed::Box;
 use std::cell::RefCell;
 use std::io::prelude::*;
+use std::io;
 use std::process;
+use std::result;
 use std::string::String;
-use std::sync::mpsc::{channel, Sender, Receiver,TryRecvError};
+use std::sync::mpsc;
+use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
@@ -32,10 +38,16 @@ pub struct Error {
 }
 
 enum SerialCommand {
-    ConnectToPort { name: String, baud: String },
+    ConnectToPort { name: String, baud: usize },
     Disconnect,
     SendData(Vec<u8>),
     SendFile(String)
+}
+
+enum GeneralError {
+    Io(io::Error),
+    Parse(num::ParseIntError),
+    Send(mpsc::SendError<SerialCommand>)
 }
 
 // declare a new thread local storage key
@@ -43,8 +55,27 @@ thread_local!(
     static GLOBAL: RefCell<Option<(gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>)>> = RefCell::new(None)
 );
 
-fn open_port(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) {
-    tx.send(SerialCommand::ConnectToPort { name: port_name, baud: baud_rate });
+fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
+    let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
+    try!(tx.send(SerialCommand::ConnectToPort { name: port_name, baud: baud_rate }).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
+fn open_port(port_name: String, baud_rate: usize) -> serial::Result<Box<serial::SystemPort>> {
+    // Open the specified serial port
+    let mut port = try!(serial::open(&port_name));
+
+    // Configure the port settings
+    try!(port.reconfigure(&|settings| {
+        try!(settings.set_baud_rate(BaudRate::from_speed(baud_rate)));
+        settings.set_char_size(serial::Bits8);
+        settings.set_parity(serial::ParityNone);
+        settings.set_stop_bits(serial::Stop1);
+        settings.set_flow_control(serial::FlowNone);
+        Ok(())
+    }));
+
+    return Ok(Box::new(port));
 }
 
 fn main() {
@@ -88,18 +119,7 @@ fn main() {
         ports_selector.set_sensitive(false);
     }
     let ports_selector_container = gtk::ToolItem::new();
-    if let Ok(ports) = serial::list_ports() {
-        for p in ports {
-            println!("{}", p.port_name);
-            ports_selector.append(None, &p.port_name);
-        }
-        ports_selector.set_active(0);
-    } else {
-        println!("No ports found");
-        ports_selector.append(None, "No ports found");
-        ports_selector.set_active(0);
-        ports_selector.set_sensitive(false);
-    }
+    ports_selector_container.add(&ports_selector);
 
     toolbar.add(&ports_selector_container);
     let baud_selector = gtk::ComboBoxText::new();
@@ -149,42 +169,7 @@ fn main() {
     // Open a thread to monitor the active serial channel. This thread is always-running and listening
     // for various port-related commands, but is not necessarily always connected to the port.
     thread::spawn(move || {
-        let mut port : Option<serial::SystemPort> = None;
-        /*
-        if let Ok(cmd) = to_port_chan_rx.try_recv() {
-            match cmd {
-                ConnectToPort(d) => {
-                    // Open the specified serial port
-                    port = match serial::open(&d.name) {
-                        Ok(p) => { p }
-                        Err(e) => { println!("Failed to open {}: {}", port_name, e.to_string()); process::exit(ExitCode::BadPort as i32)}
-                    };
-
-                    // Parse the baud rate setting
-                    let baud_rate : usize = match d.baud.parse() {
-                        Ok(b) => b,
-                        Err(_) => {
-                            println!("Failed to parse baud rate, please specify a valid integer ({} was specified)",
-                            port_name); process::exit(ExitCode::ConfigurationError as i32)
-                        }
-                    };
-
-                    // Configure the port settings
-                    match port.reconfigure(&|settings| {
-                        try!(settings.set_baud_rate(BaudRate::from_speed(baud_rate)));
-                        settings.set_char_size(serial::Bits8);
-                        settings.set_parity(serial::ParityNone);
-                        settings.set_stop_bits(serial::Stop1);
-                        settings.set_flow_control(serial::FlowNone);
-                        Ok(())
-                    }) {
-                        Ok(_) => (),
-                        Err(e) => { println!("Failed to configure {}: {}", port_name, e.to_string()); process::exit(ExitCode::ConfigurationError as i32)}
-                    }
-                },
-                _ => ()
-            }
-        } */
+        let mut port : Option<Box<serial::SystemPort>> = None;
 
         // With a 1ms time between serial port reads, this allows up to 921600 baud connections to
         // be saturated and still work.
@@ -192,7 +177,11 @@ fn main() {
         loop {
             // First check if we have any incoming commands
             match to_port_chan_rx.try_recv() {
-                Ok(SerialCommand::ConnectToPort { name, baud }) => println!("{} @ {}", name, baud),
+                Ok(SerialCommand::ConnectToPort { name, baud }) => {
+                    if let Ok(p) = open_port(name, baud) {
+                        port = Some(p);
+                    }
+                },
                 Ok(SerialCommand::Disconnect) => println!("Disconnect!"),
                 Ok(SerialCommand::SendData(d)) => println!("SendData({})", d.len()),
                 Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
@@ -221,7 +210,12 @@ fn main() {
     if serial_port_name.len() > 0 && serial_baud.len() > 0 {
         GLOBAL.with(|global| {
             if let Some((_, ref tx, _)) = *global.borrow() {
-                open_port(tx, serial_port_name, serial_baud);
+                match send_port_open_cmd(tx, serial_port_name, serial_baud.clone()) {
+                    Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", serial_baud),
+                    Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                    Err(_) => (),
+                    Ok(_) => ()
+                }
             }
         });
     } else if serial_port_name.len() > 0 {
@@ -238,7 +232,12 @@ fn main() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref tx, _)) = *global.borrow() {
-                            open_port(tx, port_name, baud_rate);
+                            match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
+                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", serial_baud),
+                                Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                                Err(_) => (),
+                                Ok(_) => ()
+                            }
                         }
                     });
                 }
