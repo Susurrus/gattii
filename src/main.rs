@@ -39,6 +39,7 @@ pub struct Error {
 
 enum SerialCommand {
     ConnectToPort { name: String, baud: usize },
+    ChangeBaud(usize),
     Disconnect,
     SendData(Vec<u8>),
     SendFile(String)
@@ -63,6 +64,12 @@ fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: 
 
 fn send_port_close_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
     try!(tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
+fn send_port_change_baud_cmd(tx: &Sender<SerialCommand>, baud_rate: String) -> Result<(), GeneralError> {
+    let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
+    try!(tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
     Ok(())
 }
 
@@ -188,6 +195,15 @@ fn main() {
                         port = Some(p);
                     }
                 },
+                Ok(SerialCommand::ChangeBaud(baud)) => {
+                    if let Some(ref mut p) = port {
+                        println!("Changing baud to {}", baud);
+                        p.reconfigure(&|settings| {
+                            settings.set_baud_rate(BaudRate::from_speed(baud)).unwrap();
+                            Ok(())
+                        }).unwrap();
+                    }
+                },
                 Ok(SerialCommand::Disconnect) => { println!("Disconnecting"); port = None },
                 Ok(SerialCommand::SendData(d)) => println!("SendData({})", d.len()),
                 Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
@@ -209,6 +225,21 @@ fn main() {
                 None => ()
             }
             thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    baud_selector.connect_changed(move |s| {
+        if let Some(baud_rate) = s.get_active_text() {
+            GLOBAL.with(|global| {
+                if let Some((_, ref tx, _)) = *global.borrow() {
+                    match send_port_change_baud_cmd(tx, baud_rate.clone()) {
+                        Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
+                        Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                        Err(_) => (),
+                        Ok(_) => ()
+                    }
+                }
+            });
         }
     });
 
