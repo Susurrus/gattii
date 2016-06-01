@@ -61,6 +61,11 @@ fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: 
     Ok(())
 }
 
+fn send_port_close_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
+    try!(tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
 fn open_port(port_name: String, baud_rate: usize) -> serial::Result<Box<serial::SystemPort>> {
     // Open the specified serial port
     let mut port = try!(serial::open(&port_name));
@@ -178,11 +183,12 @@ fn main() {
             // First check if we have any incoming commands
             match to_port_chan_rx.try_recv() {
                 Ok(SerialCommand::ConnectToPort { name, baud }) => {
+                    println!("Connecting to {} at {}", name, baud);
                     if let Ok(p) = open_port(name, baud) {
                         port = Some(p);
                     }
                 },
-                Ok(SerialCommand::Disconnect) => println!("Disconnect!"),
+                Ok(SerialCommand::Disconnect) => { println!("Disconnecting"); port = None },
                 Ok(SerialCommand::SendData(d)) => println!("SendData({})", d.len()),
                 Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
                 Err(TryRecvError::Empty) => (),
@@ -242,6 +248,16 @@ fn main() {
                     });
                 }
             }
+        } else {
+            GLOBAL.with(|global| {
+                if let Some((_, ref tx, _)) = *global.borrow() {
+                    match send_port_close_cmd(tx) {
+                        Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
+                        Err(_) => (),
+                        Ok(_) => ()
+                    }
+                }
+            });
         }
     });
 
