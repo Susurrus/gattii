@@ -212,26 +212,7 @@ fn main() {
         }
     });
 
-    // Process any command line arguments that were passed
-    if serial_port_name.len() > 0 && serial_baud.len() > 0 {
-        GLOBAL.with(|global| {
-            if let Some((_, ref tx, _)) = *global.borrow() {
-                match send_port_open_cmd(tx, serial_port_name, serial_baud.clone()) {
-                    Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", serial_baud),
-                    Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                    Err(_) => (),
-                    Ok(_) => ()
-                }
-            }
-        });
-    } else if serial_port_name.len() > 0 {
-        println!("A baud rate must be specified as well.");
-        process::exit(ExitCode::ArgumentError as i32);
-    } else if serial_baud.len() > 0 {
-        println!("A port name must be specified as well.");
-        process::exit(ExitCode::ArgumentError as i32);
-    }
-
+    let baud = serial_baud.clone();
     open_button.connect_clicked(move |s| {
         if s.get_active() {
             if let Some(port_name) = ports_selector.get_active_text() {
@@ -239,7 +220,7 @@ fn main() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref tx, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", serial_baud),
+                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
                                 Err(_) => (),
                                 Ok(_) => ()
@@ -260,6 +241,17 @@ fn main() {
             });
         }
     });
+
+    // Process any command line arguments that were passed
+    if serial_port_name.len() > 0 && baud.len() > 0 {
+        open_button.set_active(true);
+    } else if serial_port_name.len() > 0 {
+        println!("A baud rate must be specified as well.");
+        process::exit(ExitCode::ArgumentError as i32);
+    } else if baud.len() > 0 {
+        println!("A port name must be specified as well.");
+        process::exit(ExitCode::ArgumentError as i32);
+    }
 
     window.connect_delete_event(|_, _| {
         gtk::main_quit();
