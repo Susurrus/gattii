@@ -8,6 +8,12 @@ Gattii is a serial terminal emulator that allows one to use a serial port for tr
 
 The name Gattii refers to Cryptococcus Gattii, which is named in solidarity with Rust itself, which was named after the rust family of fungi. I forgot why I originally chose this name, but now I like it so I'm just gonna keep it.
 
+Screenshots
+===========
+
+.. image:: resources/screenshot.png
+   :alt Screenshot of main window
+
 Functionality
 =============
 
