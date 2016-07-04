@@ -304,6 +304,15 @@ fn main() {
         }
     });
 
+    // Disable deletion of characters within the textview
+    GLOBAL.with(|global| {
+        if let Some((ref b, _, _, _)) = *global.borrow() {
+            b.connect_delete_range(move |b, _, _| {
+                signal_stop_emission_by_name(b, "delete-range");
+            });
+        }
+    });
+
     // Process any command line arguments that were passed
     if serial_port_name.len() > 0 && baud.len() > 0 {
         open_button.set_active(true);
