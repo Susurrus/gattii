@@ -13,3 +13,6 @@ argparse = "0.2"
 gtk = { git = "https://github.com/gtk-rs/gtk" }
 glib = { git = "https://github.com/gtk-rs/glib" }
 serial = { git = "https://github.com/susurrus/serial-rs" }
+
+[replace]
+"glib:0.1.0" = { git = "https://github.com/susurrus/glib" }
