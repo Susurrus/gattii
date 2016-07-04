@@ -11,7 +11,7 @@ The name Gattii refers to Cryptococcus Gattii, which is named in solidarity with
 Screenshots
 ===========
 
-.. image:: resources/screenshot.png
+.. image:: resources/screenshot.png?raw=true
    :alt Screenshot of main window
 
 Functionality
