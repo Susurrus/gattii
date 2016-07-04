@@ -12,7 +12,6 @@ use std::cell::RefCell;
 use std::io::prelude::*;
 use std::io;
 use std::process;
-use std::result;
 use std::string::String;
 use std::sync::mpsc;
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
