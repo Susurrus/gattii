@@ -20,6 +20,7 @@ use std::time::Duration;
 
 use argparse::{ArgumentParser, Store};
 use gtk::prelude::*;
+use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 use serial::BaudRate;
 use serial::prelude::*;
 
@@ -52,7 +53,7 @@ enum GeneralError {
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64)>> = RefCell::new(None)
 );
 
 fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
@@ -69,6 +70,11 @@ fn send_port_close_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
 fn send_port_change_baud_cmd(tx: &Sender<SerialCommand>, baud_rate: String) -> Result<(), GeneralError> {
     let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
     try!(tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
+fn send_port_data_cmd(tx: &Sender<SerialCommand>, data: Vec<u8>) -> Result<(), GeneralError> {
+    try!(tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
     Ok(())
 }
 
@@ -173,8 +179,9 @@ fn main() {
     // Set up channels for communicating with the port thread.
     let (from_port_chan_tx, from_port_chan_rx) = channel();
     let (to_port_chan_tx, to_port_chan_rx) = channel();
+    let buffer = text_view.get_buffer().unwrap();
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((text_view.get_buffer().unwrap(), to_port_chan_tx, from_port_chan_rx))
+        *global.borrow_mut() = Some((buffer, to_port_chan_tx, from_port_chan_rx, 0))
     });
 
     // Open a thread to monitor the active serial channel. This thread is always-running and listening
@@ -204,7 +211,14 @@ fn main() {
                     }
                 },
                 Ok(SerialCommand::Disconnect) => { println!("Disconnecting"); port = None },
-                Ok(SerialCommand::SendData(d)) => println!("SendData({})", d.len()),
+                Ok(SerialCommand::SendData(d)) => {
+                    if let Some(ref mut p) = port {
+                        match p.write(d.as_ref()) {
+                            Ok(_) => (),
+                            Err(e) => println!("Error in SendData: {:?}", e)
+                        }
+                    }
+                },
                 Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
                 Err(TryRecvError::Empty) => (),
                 Err(TryRecvError::Disconnected) => ()
@@ -230,7 +244,7 @@ fn main() {
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _)) = *global.borrow() {
+                if let Some((_, ref tx, _, _)) = *global.borrow() {
                     match send_port_change_baud_cmd(tx, baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -248,7 +262,7 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref tx, _)) = *global.borrow() {
+                        if let Some((_, ref tx, _, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -261,13 +275,31 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _)) = *global.borrow() {
+                if let Some((_, ref tx, _, _)) = *global.borrow() {
                     match send_port_close_cmd(tx) {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) => (),
                         Ok(_) => ()
                     }
                 }
+            });
+        }
+    });
+
+    GLOBAL.with(|global| {
+        if let Some((ref b, _, _, ref mut s)) = *global.borrow_mut() {
+            *s = b.connect_insert_text(|b, _, text| {
+                GLOBAL.with(|global| {
+                    if let Some((_, ref tx, _, _)) = *global.borrow() {
+                        let v = Vec::from(text);
+                        match send_port_data_cmd(tx, v) {
+                            Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
+                            Err(_) => (),
+                            Ok(_) => ()
+                        }
+                    }
+                });
+                signal_stop_emission_by_name(b, "insert-text");
             });
         }
     });
@@ -294,10 +326,12 @@ fn main() {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref buf, _, ref rx)) = *global.borrow() {
+        if let Some((ref buf, _, ref rx, s)) = *global.borrow() {
             if let Ok(text) = rx.try_recv() {
                 let mut end = buf.get_end_iter();
+                signal_handler_block(buf, s);
                 buf.insert(&mut end, &String::from_utf8_lossy(&text));
+                signal_handler_unblock(buf, s);
             }
         }
     });
