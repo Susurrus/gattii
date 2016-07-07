@@ -53,7 +53,7 @@ enum GeneralError {
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64, PortSettings)>> = RefCell::new(None)
 );
 
 fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
@@ -181,7 +181,7 @@ fn main() {
     let (to_port_chan_tx, to_port_chan_rx) = channel();
     let buffer = text_view.get_buffer().unwrap();
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((buffer, to_port_chan_tx, from_port_chan_rx, 0))
+        *global.borrow_mut() = Some((text_view, buffer, to_port_chan_tx, from_port_chan_rx, 0, settings))
     });
 
     // Open a thread to monitor the active serial channel. This thread is always-running and listening
@@ -244,7 +244,7 @@ fn main() {
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _, _)) = *global.borrow() {
+                if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
                     match send_port_change_baud_cmd(tx, baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -262,7 +262,7 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref tx, _, _)) = *global.borrow() {
+                        if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -275,7 +275,7 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _, _)) = *global.borrow() {
+                if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
                     match send_port_close_cmd(tx) {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) => (),
@@ -287,10 +287,10 @@ fn main() {
     });
 
     GLOBAL.with(|global| {
-        if let Some((ref b, _, _, ref mut s)) = *global.borrow_mut() {
+        if let Some((_, ref b, _, _, ref mut s, _)) = *global.borrow_mut() {
             *s = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, ref tx, _, _)) = *global.borrow() {
+                    if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
                         let v = Vec::from(text);
                         match send_port_data_cmd(tx, v) {
                             Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
@@ -306,7 +306,7 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((ref b, _, _, _)) = *global.borrow() {
+        if let Some((_, ref b, _, _, _, _)) = *global.borrow() {
             b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
@@ -335,12 +335,24 @@ fn main() {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref buf, _, ref rx, s)) = *global.borrow() {
+        if let Some((ref view, ref buf, _, ref rx, s, _)) = *global.borrow() {
             if let Ok(text) = rx.try_recv() {
-                let mut end = buf.get_end_iter();
+
+                // Don't know why this needs to be this complicated, but found
+                // the answer on the gtk+ forums:
+                // http://www.gtkforums.com/viewtopic.php?t=1307
+
+                // Get the position of the special "insert" mark
+                let mark = buf.get_insert().unwrap();
+                let mut iter = buf.get_iter_at_mark(&mark);
+
+                // Inserts buffer at the end
                 signal_handler_block(buf, s);
-                buf.insert(&mut end, &String::from_utf8_lossy(&text));
+                buf.insert(&mut iter, &String::from_utf8_lossy(&text));
                 signal_handler_unblock(buf, s);
+
+                // Scroll to the "insert" mark
+                view.scroll_mark_onscreen(&mark);
             }
         }
     });
