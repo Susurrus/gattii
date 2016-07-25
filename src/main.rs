@@ -92,7 +92,7 @@ fn open_port(port_name: String, baud_rate: usize) -> serial::Result<Box<serial::
         Ok(())
     }));
 
-    return Ok(Box::new(port));
+    Ok(Box::new(port))
 }
 
 fn main() {
@@ -220,22 +220,18 @@ fn main() {
                     }
                 },
                 Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
-                Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => ()
+                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => ()
             }
 
-            match port {
-                Some(ref mut p) => {
-                    let rx_data_len = match p.read(serial_buf.as_mut_slice()) {
-                        Ok(t) => t,
-                        Err(_) => 0
-                    };
-                    if rx_data_len > 0 {
-                        from_port_chan_tx.send(serial_buf[..rx_data_len].to_vec()).unwrap();
-                        glib::idle_add(receive);
-                    }
-                },
-                None => ()
+            if let Some(ref mut p) = port {
+                let rx_data_len = match p.read(serial_buf.as_mut_slice()) {
+                    Ok(t) => t,
+                    Err(_) => 0
+                };
+                if rx_data_len > 0 {
+                    from_port_chan_tx.send(serial_buf[..rx_data_len].to_vec()).unwrap();
+                    glib::idle_add(receive);
+                }
             }
             thread::sleep(Duration::from_millis(1));
         }
@@ -248,8 +244,7 @@ fn main() {
                     match send_port_change_baud_cmd(tx, baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                        Err(_) => (),
-                        Ok(_) => ()
+                        Err(_) | Ok(_) => ()
                     }
                 }
             });
@@ -266,8 +261,7 @@ fn main() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                                Err(_) => (),
-                                Ok(_) => ()
+                                Err(_) | Ok(_) => ()
                             }
                         }
                     });
@@ -278,8 +272,7 @@ fn main() {
                 if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
                     match send_port_close_cmd(tx) {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
-                        Err(_) => (),
-                        Ok(_) => ()
+                        Err(_) | Ok(_) => ()
                     }
                 }
             });
@@ -294,8 +287,7 @@ fn main() {
                         let v = Vec::from(text);
                         match send_port_data_cmd(tx, v) {
                             Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
-                            Err(_) => (),
-                            Ok(_) => ()
+                            Err(_) | Ok(_) => ()
                         }
                     }
                 });
@@ -314,12 +306,12 @@ fn main() {
     });
 
     // Process any command line arguments that were passed
-    if serial_port_name.len() > 0 && baud.len() > 0 {
+    if !serial_port_name.is_empty() && !baud.is_empty() {
         open_button.set_active(true);
-    } else if serial_port_name.len() > 0 {
+    } else if !serial_port_name.is_empty() {
         println!("A baud rate must be specified as well.");
         process::exit(ExitCode::ArgumentError as i32);
-    } else if baud.len() > 0 {
+    } else if !baud.is_empty() {
         println!("A port name must be specified as well.");
         process::exit(ExitCode::ArgumentError as i32);
     }
