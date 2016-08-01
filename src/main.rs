@@ -40,6 +40,7 @@ pub struct Error {
 enum SerialCommand {
     ConnectToPort { name: String, baud: usize },
     ChangeBaud(usize),
+    ChangePort(String),
     Disconnect,
     SendData(Vec<u8>),
     SendFile(String)
@@ -53,7 +54,7 @@ enum GeneralError {
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64, PortSettings)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64)>> = RefCell::new(None)
 );
 
 fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
@@ -70,6 +71,11 @@ fn send_port_close_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
 fn send_port_change_baud_cmd(tx: &Sender<SerialCommand>, baud_rate: String) -> Result<(), GeneralError> {
     let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
     try!(tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
+fn send_port_change_port_cmd(tx: &Sender<SerialCommand>, port_name: String) -> Result<(), GeneralError> {
+    try!(tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
     Ok(())
 }
 
@@ -181,13 +187,20 @@ fn main() {
     let (to_port_chan_tx, to_port_chan_rx) = channel();
     let buffer = text_view.get_buffer().unwrap();
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((text_view, buffer, to_port_chan_tx, from_port_chan_rx, 0, settings))
+        *global.borrow_mut() = Some((text_view, buffer, to_port_chan_tx, from_port_chan_rx, 0))
     });
 
     // Open a thread to monitor the active serial channel. This thread is always-running and listening
     // for various port-related commands, but is not necessarily always connected to the port.
     thread::spawn(move || {
         let mut port : Option<Box<serial::SystemPort>> = None;
+        let mut port_settings : serial::PortSettings = serial::PortSettings{
+            baud_rate: serial::Baud115200,
+            char_size: serial::Bits8,
+            parity: serial::ParityNone,
+            stop_bits: serial::Stop1,
+            flow_control: serial::FlowNone
+        };
 
         // With a 1ms time between serial port reads, this allows up to 921600 baud connections to
         // be saturated and still work.
@@ -204,11 +217,19 @@ fn main() {
                 Ok(SerialCommand::ChangeBaud(baud)) => {
                     if let Some(ref mut p) = port {
                         println!("Changing baud to {}", baud);
-                        p.reconfigure(&|settings| {
-                            settings.set_baud_rate(BaudRate::from_speed(baud)).unwrap();
+                        let baud_rate = BaudRate::from_speed(baud);
+                        p.reconfigure(&|s| {
+                            s.set_baud_rate(baud_rate).unwrap();
                             Ok(())
                         }).unwrap();
+                        port_settings.set_baud_rate(baud_rate).unwrap();
                     }
+                },
+                Ok(SerialCommand::ChangePort(name)) => {
+                    println!("Changing port to {}", name);
+                    let mut p = Box::new(serial::open(&name).unwrap());
+                    p.configure(&port_settings).unwrap();
+                    port = Some(p);
                 },
                 Ok(SerialCommand::Disconnect) => { println!("Disconnecting"); port = None },
                 Ok(SerialCommand::SendData(d)) => {
@@ -240,9 +261,23 @@ fn main() {
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
+                if let Some((_, _, ref tx, _, _)) = *global.borrow() {
                     match send_port_change_baud_cmd(tx, baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
+                        Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                        Err(_) | Ok(_) => ()
+                    }
+                }
+            });
+        }
+    });
+
+    ports_selector.connect_changed(move |s| {
+        if let Some(port_name) = s.get_active_text() {
+            GLOBAL.with(|global| {
+                if let Some((_, _, ref tx, _, _)) = *global.borrow() {
+                    match send_port_change_port_cmd(tx, port_name.clone()) {
+                        Err(GeneralError::Parse(_)) => println!("Invalid port name '{}' specified.", &port_name),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
                     }
@@ -257,7 +292,7 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
+                        if let Some((_, _, ref tx, _, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -269,7 +304,7 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
+                if let Some((_, _, ref tx, _, _)) = *global.borrow() {
                     match send_port_close_cmd(tx) {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
@@ -280,10 +315,10 @@ fn main() {
     });
 
     GLOBAL.with(|global| {
-        if let Some((_, ref b, _, _, ref mut s, _)) = *global.borrow_mut() {
+        if let Some((_, ref b, _, _, ref mut s)) = *global.borrow_mut() {
             *s = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, _, ref tx, _, _, _)) = *global.borrow() {
+                    if let Some((_, _, ref tx, _, _)) = *global.borrow() {
                         let v = Vec::from(text);
                         match send_port_data_cmd(tx, v) {
                             Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
@@ -298,7 +333,7 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((_, ref b, _, _, _, _)) = *global.borrow() {
+        if let Some((_, ref b, _, _, _)) = *global.borrow() {
             b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
@@ -327,7 +362,7 @@ fn main() {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref view, ref buf, _, ref rx, s, _)) = *global.borrow() {
+        if let Some((ref view, ref buf, _, ref rx, s)) = *global.borrow() {
             if let Ok(text) = rx.try_recv() {
 
                 // Don't know why this needs to be this complicated, but found
