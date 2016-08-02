@@ -104,6 +104,11 @@ fn send_port_data_cmd(tx: &Sender<SerialCommand>, data: Vec<u8>) -> Result<(), G
     Ok(())
 }
 
+fn send_port_file_cmd(tx: &Sender<SerialCommand>, file: String) -> Result<(), GeneralError> {
+    try!(tx.send(SerialCommand::SendFile(file)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+    Ok(())
+}
+
 fn open_port(port_name: String, baud_rate: usize) -> serial::Result<Box<serial::SystemPort>> {
     // Open the specified serial port
     let mut port = try!(serial::open(&port_name));
