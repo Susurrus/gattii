@@ -9,6 +9,7 @@ extern crate serial;
 use core::num;
 use std::boxed::Box;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io;
 use std::process;
@@ -23,6 +24,25 @@ use gtk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 use serial::BaudRate;
 use serial::prelude::*;
+
+// make moving clones into closures more convenient
+// Taken from: https://github.com/gtk-rs/examples/blob/pending/src/cairo_threads.rs#L17
+macro_rules! clone {
+    (@param _) => ( _ );
+    (@param $x:ident) => ( $x );
+    ($($n:ident),+ => move || $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+            move || $body
+        }
+    );
+    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
+        {
+            $( let $n = $n.clone(); )+
+            move |$(clone!(@param $p),)+| $body
+        }
+    );
+}
 
 #[derive(Debug)]
 enum ExitCode {
@@ -131,9 +151,13 @@ fn main() {
     // Create a toolbar with the basic options in it
     let toolbar = gtk::Toolbar::new();
     let ports_selector = gtk::ComboBoxText::new();
+    let mut ports_selector_map = HashMap::new();
     if let Ok(ports) = serial::list_ports() {
+        let mut i : i32 = 0;
         for p in ports {
             ports_selector.append(None, &p.port_name);
+            ports_selector_map.insert(p.port_name, i);
+            i += 1;
         }
         ports_selector.set_active(0);
     } else {
@@ -144,6 +168,13 @@ fn main() {
     let ports_selector_container = gtk::ToolItem::new();
     ports_selector_container.add(&ports_selector);
 
+    let mut baud_selector_map = HashMap::new();
+    baud_selector_map.insert("921600".to_string(), 0i32);
+    baud_selector_map.insert("115200".to_string(), 1i32);
+    baud_selector_map.insert("57600".to_string(), 2i32);
+    baud_selector_map.insert("38400".to_string(), 3i32);
+    baud_selector_map.insert("19200".to_string(), 4i32);
+    baud_selector_map.insert("9600".to_string(), 5i32);
     toolbar.add(&ports_selector_container);
     let baud_selector = gtk::ComboBoxText::new();
     baud_selector.append(None, "921600");
@@ -286,15 +317,14 @@ fn main() {
         }
     });
 
-    let baud = serial_baud.clone();
-    open_button.connect_clicked(move |s| {
+    open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
         if s.get_active() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
                         if let Some((_, _, ref tx, _, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &serial_baud),
+                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
                                 Err(_) | Ok(_) => ()
                             }
@@ -312,7 +342,7 @@ fn main() {
                 }
             });
         }
-    });
+    }));
 
     GLOBAL.with(|global| {
         if let Some((_, ref b, _, _, ref mut s)) = *global.borrow_mut() {
@@ -341,13 +371,25 @@ fn main() {
     });
 
     // Process any command line arguments that were passed
-    if !serial_port_name.is_empty() && !baud.is_empty() {
+    if !serial_port_name.is_empty() && !serial_baud.is_empty() {
+        if let Some(ports_selector_index) = ports_selector_map.get(&serial_port_name) {
+            ports_selector.set_active(*ports_selector_index);
+        } else {
+            println!("ERROR: Invalid port name '{}' specified.", serial_port_name);
+            process::exit(ExitCode::ArgumentError as i32);
+        }
+        if let Some(baud_selector_index) = baud_selector_map.get(&serial_baud) {
+            baud_selector.set_active(*baud_selector_index);
+        } else {
+            println!("ERROR: Invalid baud rate '{}' specified.", serial_baud);
+            process::exit(ExitCode::ArgumentError as i32);
+        }
         open_button.set_active(true);
     } else if !serial_port_name.is_empty() {
-        println!("A baud rate must be specified as well.");
+        println!("ERROR: A baud rate must be specified.");
         process::exit(ExitCode::ArgumentError as i32);
-    } else if !baud.is_empty() {
-        println!("A port name must be specified as well.");
+    } else if !serial_baud.is_empty() {
+        println!("ERROR: A port name must be specified.");
         process::exit(ExitCode::ArgumentError as i32);
     }
 
