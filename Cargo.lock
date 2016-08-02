@@ -72,7 +72,7 @@ dependencies = [
 [[package]]
 name = "gdk"
 version = "0.5.0"
-source = "git+https://github.com/gtk-rs/gdk#a6f6a6709ad97af277bee1b45a4da69afdeb65a5"
+source = "git+https://github.com/gtk-rs/gdk#d58cc4d3621148703669dac5435a5e8467cbf2f7"
 dependencies = [
  "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-rs 0.1.0 (git+https://github.com/gtk-rs/cairo)",
@@ -153,12 +153,6 @@ dependencies = [
 name = "glib"
 version = "0.1.0"
 source = "git+https://github.com/gtk-rs/glib#9f77b36524b9bfb5196cba48fc25314cd5345664"
-replace = "glib 0.1.0 (git+https://github.com/susurrus/glib)"
-
-[[package]]
-name = "glib"
-version = "0.1.0"
-source = "git+https://github.com/susurrus/glib#b20bd7ebcbca5f7bca28d41f74ed716bdfe39496"
 dependencies = [
  "gio-sys 0.3.1 (git+https://github.com/gtk-rs/sys)",
  "glib-sys 0.3.1 (git+https://github.com/gtk-rs/sys)",
