@@ -212,6 +212,16 @@ fn main() {
     let text_view_style_context = text_view.get_style_context().unwrap();
     text_view_style_context.add_provider(&css_style_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
+    // Add some actions on the right
+    let separator = gtk::SeparatorToolItem::new();
+    separator.set_draw(false);
+    separator.set_expand(true);
+    toolbar.add(&separator);
+    let folder_image = gtk::Image::new_from_icon_name("folder", gtk::IconSize::Button.into());
+    let send_file_button = gtk::ToolButton::new(Some(&folder_image), None);
+    send_file_button.set_icon_name(Some("folder"));
+    toolbar.add(&send_file_button);
+
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
     vbox.pack_start(&toolbar, false, false, 0);
@@ -347,6 +357,22 @@ fn main() {
                 }
             });
         }
+    }));
+
+    send_file_button.connect_clicked(clone!(window => move |s| {
+        let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(&window), gtk::FileChooserAction::Open);
+        dialog.add_buttons(&[
+            ("Send", gtk::ResponseType::Ok.into()),
+            ("Cancel", gtk::ResponseType::Cancel.into()),
+        ]);
+        let result = dialog.run();
+        if result == gtk::ResponseType::Ok.into() {
+            println!("YAY!! {}", dialog.get_filename().unwrap().to_str().unwrap());
+        } else {
+            println!("Boo...");
+        }
+
+        dialog.destroy();
     }));
 
     GLOBAL.with(|global| {
