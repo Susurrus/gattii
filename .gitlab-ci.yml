@@ -5,7 +5,8 @@ stages:
     - test
 
 before_script:
-    - apt-get install -y libudev-dev
+    - apt-get -qq update
+    - apt-get -qq -y install libudev-dev libgtk-3-dev
 
 build-debug:
     stage: build
