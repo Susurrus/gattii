@@ -4,6 +4,9 @@ stages:
     - build
     - test
 
+before_script:
+    - apt-get install -y libudev-dev
+
 build-debug:
     stage: build
     script:
