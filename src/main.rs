@@ -214,7 +214,7 @@ fn main() {
 
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    vbox.pack_start(&toolbar, false, true, 0);
+    vbox.pack_start(&toolbar, false, false, 0);
     vbox.pack_start(&scroll, true, true, 0);
     window.add(&vbox);
 
