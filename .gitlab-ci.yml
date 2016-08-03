@@ -1,6 +1,23 @@
 image: "scorpil/rust:stable"
 
-test:cargo:
+stages:
+    - build
+    - test
+
+build-debug:
+    stage: build
     script:
-    - rustc --version && cargo --version # Print version info for debugging
-    - cargo test --verbose --jobs 1 --release # Don't parallelize to make errors more readable
+        - rustc --version && cargo --version # Print version info for debugging
+        - cargo build --verbose
+
+build-release:
+    stage: build
+    script:
+        - rustc --version && cargo --version # Print version info for debugging
+        - cargo build --verbose --release
+
+test:
+    stage: test
+    script:
+        - rustc --version && cargo --version # Print version info for debugging
+        - cargo test --verbose --jobs 1 --release # Don't parallelize to make errors more readable
