@@ -67,6 +67,11 @@ enum SerialCommand {
     SendFile(PathBuf)
 }
 
+enum SerialResponse {
+    Data(Vec<u8>),
+    SendingFileComplete
+}
+
 enum GeneralError {
     Io(io::Error),
     Parse(num::ParseIntError),
@@ -75,7 +80,7 @@ enum GeneralError {
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, Sender<SerialCommand>, Receiver<Vec<u8>>, u64)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, Sender<SerialCommand>, Receiver<SerialResponse>, u64)>> = RefCell::new(None)
 );
 
 fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
@@ -297,7 +302,8 @@ fn main() {
                     Err(_) => 0
                 };
                 if rx_data_len > 0 {
-                    from_port_chan_tx.send(serial_buf[..rx_data_len].to_vec()).unwrap();
+                    let send_data = SerialResponse::Data(serial_buf[..rx_data_len].to_vec());
+                    from_port_chan_tx.send(send_data).unwrap();
                     glib::idle_add(receive);
                 }
             }
@@ -443,23 +449,27 @@ fn main() {
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
         if let Some((ref view, ref buf, _, ref rx, s)) = *global.borrow() {
-            if let Ok(text) = rx.try_recv() {
+            match rx.try_recv() {
+                Ok(SerialResponse::Data(data)) => {
 
-                // Don't know why this needs to be this complicated, but found
-                // the answer on the gtk+ forums:
-                // http://www.gtkforums.com/viewtopic.php?t=1307
+                    // Don't know why this needs to be this complicated, but found
+                    // the answer on the gtk+ forums:
+                    // http://www.gtkforums.com/viewtopic.php?t=1307
 
-                // Get the position of the special "insert" mark
-                let mark = buf.get_insert().unwrap();
-                let mut iter = buf.get_iter_at_mark(&mark);
+                    // Get the position of the special "insert" mark
+                    let mark = buf.get_insert().unwrap();
+                    let mut iter = buf.get_iter_at_mark(&mark);
 
-                // Inserts buffer at the end
-                signal_handler_block(buf, s);
-                buf.insert(&mut iter, &String::from_utf8_lossy(&text));
-                signal_handler_unblock(buf, s);
+                    // Inserts buffer at the end
+                    signal_handler_block(buf, s);
+                    buf.insert(&mut iter, &String::from_utf8_lossy(&data));
+                    signal_handler_unblock(buf, s);
 
-                // Scroll to the "insert" mark
-                view.scroll_mark_onscreen(&mark);
+                    // Scroll to the "insert" mark
+                    view.scroll_mark_onscreen(&mark);
+                },
+                Ok(SerialResponse::SendingFileComplete) => println!("All done!"),
+                Err(_) => ()
             }
         }
     });
