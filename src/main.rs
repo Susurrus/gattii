@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io;
+use std::path::PathBuf;
 use std::process;
 use std::string::String;
 use std::sync::mpsc;
@@ -63,7 +64,7 @@ enum SerialCommand {
     ChangePort(String),
     Disconnect,
     SendData(Vec<u8>),
-    SendFile(String)
+    SendFile(PathBuf)
 }
 
 enum GeneralError {
@@ -104,8 +105,8 @@ fn send_port_data_cmd(tx: &Sender<SerialCommand>, data: Vec<u8>) -> Result<(), G
     Ok(())
 }
 
-fn send_port_file_cmd(tx: &Sender<SerialCommand>, file: String) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::SendFile(file)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+fn send_port_file_cmd(tx: &Sender<SerialCommand>, path: PathBuf) -> Result<(), GeneralError> {
+    try!(tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
     Ok(())
 }
 
@@ -286,7 +287,7 @@ fn main() {
                         }
                     }
                 },
-                Ok(SerialCommand::SendFile(f)) => println!("SendFile({})", f.len()),
+                Ok(SerialCommand::SendFile(f)) => println!("SendFile({:?})", f),
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => ()
             }
 
@@ -367,9 +368,15 @@ fn main() {
         ]);
         let result = dialog.run();
         if result == gtk::ResponseType::Ok.into() {
-            println!("YAY!! {}", dialog.get_filename().unwrap().to_str().unwrap());
-        } else {
-            println!("Boo...");
+            let filename = dialog.get_filename().unwrap();
+            GLOBAL.with(|global| {
+                if let Some((_, _, ref tx, _, _)) = *global.borrow() {
+                    match send_port_file_cmd(tx, filename) {
+                        Err(GeneralError::Send(_)) => println!("Error sending port_file command to child thread. Aborting."),
+                        Err(_) | Ok(_) => ()
+                    }
+                }
+            });
         }
 
         dialog.destroy();
