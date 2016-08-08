@@ -10,6 +10,7 @@ use core::num;
 use std::boxed::Box;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io;
 use std::path::PathBuf;
@@ -253,10 +254,12 @@ fn main() {
             stop_bits: serial::Stop1,
             flow_control: serial::FlowNone
         };
+        let mut read_file : Option<Box<File>> = None;
 
         // With a 1ms time between serial port reads, this allows up to 921600 baud connections to
         // be saturated and still work.
         let mut serial_buf: Vec<u8> = vec![0; 100];
+        let mut serial_buf_rx = [0; 100];
         loop {
             // First check if we have any incoming commands
             match to_port_chan_rx.try_recv() {
@@ -292,7 +295,12 @@ fn main() {
                         }
                     }
                 },
-                Ok(SerialCommand::SendFile(f)) => println!("SendFile({:?})", f),
+                Ok(SerialCommand::SendFile(f)) => {
+                    println!("Opening file '{:?}'", f);
+                    if let Ok(new_file) = File::open(f) {
+                        read_file = Some(Box::new(new_file));
+                    }
+                },
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => ()
             }
 
@@ -306,7 +314,39 @@ fn main() {
                     from_port_chan_tx.send(send_data).unwrap();
                     glib::idle_add(receive);
                 }
+
+                // If a file has been opened, read the next 1ms of data from it as
+                // determined by the current baud rate.
+                let mut read_len : usize = 0;
+                if let Some(ref mut file) = read_file {
+                    let mut byte_as_serial_bits = 1 + 8;
+                    if port_settings.parity != serial::ParityNone {
+                        byte_as_serial_bits += 1;
+                    }
+                    if port_settings.stop_bits == serial::Stop1 {
+                        byte_as_serial_bits += 1;
+                    } else if port_settings.stop_bits == serial::Stop2 {
+                        byte_as_serial_bits += 2;
+                    }
+                    let tx_data_len = port_settings.baud_rate.speed() / byte_as_serial_bits / 1000;
+                    if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
+                        read_len = len;
+                    } else {
+                        println!("Failed to read {} bytes", tx_data_len);
+                    }
+                }
+                if read_len > 0 {
+                    if let Ok(_) = p.write(&serial_buf_rx[..read_len]) {
+                        println!("Sent {} bytes", read_len);
+                    } else {
+                        println!("Failed to send {} bytes", read_len);
+                        read_file = None;
+                    }
+                } else if read_file.is_some() {
+                    read_file = None;
+                }
             }
+
             thread::sleep(Duration::from_millis(1));
         }
     });
