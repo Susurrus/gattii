@@ -70,7 +70,8 @@ enum SerialCommand {
 
 enum SerialResponse {
     Data(Vec<u8>),
-    SendingFileComplete
+    SendingFileComplete,
+    SendingFileError(String)
 }
 
 enum GeneralError {
@@ -81,7 +82,7 @@ enum GeneralError {
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(gtk::TextView, gtk::TextBuffer, gtk::ToolButton, Sender<SerialCommand>, Receiver<SerialResponse>, u64)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(gtk::Window, gtk::TextView, gtk::TextBuffer, gtk::ToolButton, Sender<SerialCommand>, Receiver<SerialResponse>, u64)>> = RefCell::new(None)
 );
 
 fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
@@ -240,7 +241,7 @@ fn main() {
     let (to_port_chan_tx, to_port_chan_rx) = channel();
     let buffer = text_view.get_buffer().unwrap();
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((text_view, buffer, send_file_button, to_port_chan_tx, from_port_chan_rx, 0))
+        *global.borrow_mut() = Some((window, text_view, buffer, send_file_button, to_port_chan_tx, from_port_chan_rx, 0))
     });
 
     // Open a thread to monitor the active serial channel. This thread is always-running and listening
@@ -296,9 +297,14 @@ fn main() {
                     }
                 },
                 Ok(SerialCommand::SendFile(f)) => {
-                    println!("Sending file '{:?}'", f);
-                    if let Ok(new_file) = File::open(f) {
-                        read_file = Some(Box::new(new_file));
+                    if let Some(_) = port {
+                        println!("Sending file {:?}", f);
+                        if let Ok(new_file) = File::open(f) {
+                            read_file = Some(Box::new(new_file));
+                        }
+                    } else {
+                        from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
+                        glib::idle_add(receive);
                     }
                 },
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => ()
@@ -354,7 +360,7 @@ fn main() {
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                     match send_port_change_baud_cmd(tx, baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -368,7 +374,7 @@ fn main() {
     ports_selector.connect_changed(move |s| {
         if let Some(port_name) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                     match send_port_change_port_cmd(tx, port_name.clone()) {
                         Err(GeneralError::Parse(_)) => println!("Invalid port name '{}' specified.", &port_name),
                         Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -384,7 +390,7 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                        if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                             match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
@@ -396,7 +402,7 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                     match send_port_close_cmd(tx) {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
@@ -407,7 +413,7 @@ fn main() {
     }));
 
     GLOBAL.with(|global| {
-        if let Some((_, _, ref b, _, _, _)) = *global.borrow() {
+        if let Some((ref window, _, _, ref b, _, _, _)) = *global.borrow() {
             b.connect_clicked(clone!(window => move |s| {
                 let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(&window), gtk::FileChooserAction::Open);
                 dialog.add_buttons(&[
@@ -418,7 +424,7 @@ fn main() {
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
                     GLOBAL.with(|global| {
-                        if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                        if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                             match send_port_file_cmd(tx, filename) {
                                 Err(GeneralError::Send(_)) => println!("Error sending port_file command to child thread. Aborting."),
                                 Err(_) => (),
@@ -436,10 +442,10 @@ fn main() {
     });
 
     GLOBAL.with(|global| {
-        if let Some((_, ref b, _, _, _, ref mut s)) = *global.borrow_mut() {
+        if let Some((_, _, ref b, _, _, _, ref mut s)) = *global.borrow_mut() {
             *s = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, _, _, ref tx, _, _)) = *global.borrow() {
+                    if let Some((_, _, _, _, ref tx, _, _)) = *global.borrow() {
                         let v = Vec::from(text);
                         match send_port_data_cmd(tx, v) {
                             Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
@@ -454,7 +460,7 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((_, ref b, _, _, _, _)) = *global.borrow() {
+        if let Some((_, _, ref b, _, _, _, _)) = *global.borrow() {
             b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
@@ -484,18 +490,23 @@ fn main() {
         process::exit(ExitCode::ArgumentError as i32);
     }
 
-    window.connect_delete_event(|_, _| {
-        gtk::main_quit();
-        Inhibit(false)
+    GLOBAL.with(|global| {
+        if let Some((ref window, _, _, _, _, _, _)) = *global.borrow() {
+            window.connect_delete_event(|_, _| {
+                gtk::main_quit();
+                Inhibit(false)
+            });
+
+            window.show_all();
+        }
     });
 
-    window.show_all();
     gtk::main();
 }
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref view, ref buf, ref f_button, _, ref rx, s)) = *global.borrow() {
+        if let Some((ref window, ref view, ref buf, ref f_button, _, ref rx, s)) = *global.borrow() {
             match rx.try_recv() {
                 Ok(SerialResponse::Data(data)) => {
 
@@ -516,6 +527,17 @@ fn receive() -> glib::Continue {
                     view.scroll_mark_onscreen(&mark);
                 },
                 Ok(SerialResponse::SendingFileComplete) => f_button.set_sensitive(true),
+                Ok(SerialResponse::SendingFileError(s)) => {
+                    println!("{}", s);
+                    let dialog = gtk::MessageDialog::new(Some(window),
+                        gtk::DIALOG_DESTROY_WITH_PARENT,
+                        gtk::MessageType::Error,
+                        gtk::ButtonsType::Ok,
+                        "Error sending file");
+                    dialog.run();
+                    dialog.destroy();
+                    f_button.set_sensitive(true);
+                },
                 Err(_) => ()
             }
         }
