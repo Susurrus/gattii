@@ -313,6 +313,7 @@ fn main() {
                 Ok(SerialCommand::Disconnect) => {
                     println!("Disconnecting");
                     port = None;
+                    read_file = None;
                     from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
                     glib::idle_add(receive);
                 },
