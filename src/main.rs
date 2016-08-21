@@ -284,10 +284,8 @@ fn main() {
         };
         let mut read_file : Option<Box<File>> = None;
 
-        // With a 1ms time between serial port reads, this allows up to 921600 baud connections to
-        // be saturated and still work.
-        let mut serial_buf: Vec<u8> = vec![0; 100];
-        let mut serial_buf_rx = [0; 100];
+        let mut serial_buf: Vec<u8> = vec![0; 1000];
+        let mut serial_buf_rx = [0; 1000];
         loop {
             // First check if we have any incoming commands
             match to_port_chan_rx.try_recv() {
