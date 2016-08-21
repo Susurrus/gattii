@@ -283,6 +283,7 @@ fn main() {
             flow_control: serial::FlowNone
         };
         let mut read_file : Option<Box<File>> = None;
+        let tick_rate = 10; // In milliseconds
 
         let mut serial_buf: Vec<u8> = vec![0; 1000];
         let mut serial_buf_rx = [0; 1000];
@@ -374,7 +375,7 @@ fn main() {
                     } else if port_settings.stop_bits == serial::Stop2 {
                         byte_as_serial_bits += 2;
                     }
-                    let tx_data_len = port_settings.baud_rate.speed() / byte_as_serial_bits / 1000;
+                    let tx_data_len = port_settings.baud_rate.speed() / byte_as_serial_bits / (1000 / tick_rate);
                     if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
                         read_len = len;
                     } else {
@@ -393,7 +394,7 @@ fn main() {
                 }
             }
 
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(tick_rate as u64));
         }
     });
 
