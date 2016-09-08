@@ -94,14 +94,20 @@ fn main() {
     let toolbar = gtk::Toolbar::new();
     let ports_selector = gtk::ComboBoxText::new();
     let mut ports_selector_map = HashMap::new();
-    if let Ok(ports) = serial::list_ports() {
-        let mut i : i32 = 0;
-        for p in ports {
-            ports_selector.append(None, &p.port_name);
-            ports_selector_map.insert(p.port_name, i);
-            i += 1;
+    if let Ok(ports) = serial_thread::list_ports() {
+        if ports.len() > 0 {
+            let mut i: i32 = 0;
+            for p in ports {
+                ports_selector.append(None, &p.port_name);
+                ports_selector_map.insert(p.port_name, i);
+                i += 1;
+            }
+            ports_selector.set_active(0);
+        } else {
+            ports_selector.append(None, "No ports found");
+            ports_selector.set_active(0);
+            ports_selector.set_sensitive(false);
         }
-        ports_selector.set_active(0);
     } else {
         ports_selector.append(None, "No ports found");
         ports_selector.set_active(0);
