@@ -73,9 +73,13 @@ fn main() {
         let mut ap = ArgumentParser::new();
         ap.set_description("A serial terminal.");
         ap.refer(&mut serial_port_name)
-            .add_option(&["-p", "--port"], Store, "The serial port name (COM3, /dev/ttyUSB0, etc.)");
+            .add_option(&["-p", "--port"],
+                        Store,
+                        "The serial port name (COM3, /dev/ttyUSB0, etc.)");
         ap.refer(&mut serial_baud)
-            .add_option(&["-b", "--baud"], Store, "The serial port baud rate (default 115200)");
+            .add_option(&["-b", "--baud"],
+                        Store,
+                        "The serial port baud rate (default 115200)");
         ap.parse_args_or_exit();
     }
 
@@ -153,7 +157,8 @@ fn main() {
     let style = "GtkTextView { font: Monospace 11 }";
     css_style_provider.load_from_data(style).unwrap();
     let text_view_style_context = text_view.get_style_context().unwrap();
-    text_view_style_context.add_provider(&css_style_provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    text_view_style_context.add_provider(&css_style_provider,
+                                         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     // Add send file button
     let separator = gtk::SeparatorToolItem::new();
@@ -179,10 +184,13 @@ fn main() {
         text_buffer: buffer.clone(),
         open_button: open_button.clone(),
         file_button: send_file_button.clone(),
-        text_view_insert_signal: 0
+        text_view_insert_signal: 0,
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui, SerialThread::new(|| {glib::idle_add(receive);})))
+        *global.borrow_mut() = Some((ui,
+                                     SerialThread::new(|| {
+            glib::idle_add(receive);
+        })))
     });
 
     baud_selector.connect_changed(move |s| {
@@ -386,40 +394,43 @@ fn receive() -> glib::Continue {
 
                     // Scroll to the "insert" mark
                     view.scroll_mark_onscreen(&mark);
-                },
+                }
                 Ok(SerialResponse::DisconnectSuccess) => {
                     f_button.set_sensitive(false);
                     f_button.set_active(false);
-                },
+                }
                 Ok(SerialResponse::OpenPortSuccess) => {
                     f_button.set_sensitive(true);
-                },
+                }
                 Ok(SerialResponse::OpenPortError(s)) => {
                     println!("OpenPortError: {}", s);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                        gtk::DIALOG_DESTROY_WITH_PARENT,
-                        gtk::MessageType::Error,
-                        gtk::ButtonsType::Ok,
-                        "Error opening port");
+                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         gtk::MessageType::Error,
+                                                         gtk::ButtonsType::Ok,
+                                                         "Error opening port");
                     dialog.run();
                     dialog.destroy();
                     f_button.set_sensitive(false);
-                },
-                Ok(SerialResponse::SendingFileComplete) | Ok(SerialResponse::SendingFileCanceled) => {
+                }
+                Ok(SerialResponse::SendingFileComplete) |
+                Ok(SerialResponse::SendingFileCanceled) => {
                     println!("Sending file complete");
                     f_button.set_active(false);
-                },
+                    view.set_editable(true);
+                }
                 Ok(SerialResponse::SendingFileError(s)) => {
                     f_button.set_active(false);
+                    view.set_editable(true);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                        gtk::DIALOG_DESTROY_WITH_PARENT,
-                        gtk::MessageType::Error,
-                        gtk::ButtonsType::Ok,
-                        "Error sending file");
+                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         gtk::MessageType::Error,
+                                                         gtk::ButtonsType::Ok,
+                                                         "Error sending file");
                     dialog.run();
                     dialog.destroy();
-                },
-                Err(_) => ()
+                }
+                Err(_) => (),
             }
         }
     });

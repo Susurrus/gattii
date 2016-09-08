@@ -41,7 +41,7 @@ pub enum GeneralError {
 
 pub struct SerialThread {
     pub from_port_chan_rx: Receiver<SerialResponse>,
-    pub to_port_chan_tx: Sender<SerialCommand>
+    pub to_port_chan_tx: Sender<SerialCommand>,
 }
 
 pub fn list_ports() -> serial::Result<Vec<PortInfo>> {
@@ -152,7 +152,7 @@ impl SerialThread {
 
                     // If a file has been opened, read the next 1ms of data from it as
                     // determined by the current baud rate.
-                    let mut read_len : Option<usize> = None;
+                    let mut read_len: Option<usize> = None;
                     if let Some(ref mut file) = read_file {
                         let mut byte_as_serial_bits = 1 + 8;
                         if port_settings.parity != serial::ParityNone {
@@ -167,7 +167,9 @@ impl SerialThread {
                         // variation
                         let data_packet_time = 10; // ms
                         if last_send_time.elapsed().subsec_nanos() > data_packet_time * 1_000_000 {
-                            let tx_data_len = port_settings.baud_rate.speed() / byte_as_serial_bits / (1000 / data_packet_time as usize);
+                            let tx_data_len = port_settings.baud_rate.speed() /
+                                              byte_as_serial_bits /
+                                              (1000 / data_packet_time as usize);
                             println!("Reading {} bytes", tx_data_len);
                             if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
                                 read_len = Some(len);
@@ -180,17 +182,22 @@ impl SerialThread {
                     }
 
                     match read_len {
-                        Some(x) => if x > 0 {
-                            if let Err(_) = p.write(&serial_buf_rx[..x]) {
-                                println!("Failed to send {} bytes", x);
-                                read_file = None;
+                        Some(x) => {
+                            if x > 0 {
+                                if let Err(_) = p.write(&serial_buf_rx[..x]) {
+                                    println!("Failed to send {} bytes", x);
+                                    read_file = None;
+                                }
+                                last_send_time = Instant::now();
                             }
-                            last_send_time = Instant::now();
-                        },
-                        None => if read_file.is_some() {
-                            read_file = None;
-                            from_port_chan_tx.send(SerialResponse::SendingFileComplete).unwrap();
-                            callback();
+                        }
+                        None => {
+                            if read_file.is_some() {
+                                read_file = None;
+                                from_port_chan_tx.send(SerialResponse::SendingFileComplete)
+                                    .unwrap();
+                                callback();
+                            }
                         }
                     }
                 }
@@ -199,14 +206,21 @@ impl SerialThread {
 
         SerialThread {
             from_port_chan_rx: from_port_chan_rx,
-            to_port_chan_tx: to_port_chan_tx
+            to_port_chan_tx: to_port_chan_tx,
         }
     }
 
-    pub fn send_port_open_cmd(&self, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
+    pub fn send_port_open_cmd(&self,
+                              port_name: String,
+                              baud_rate: String)
+                              -> Result<(), GeneralError> {
         let baud_rate: usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::ConnectToPort { name: port_name, baud: baud_rate }).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        try!(tx.send(SerialCommand::ConnectToPort {
+                name: port_name,
+                baud: baud_rate,
+            })
+            .map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
