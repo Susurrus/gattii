@@ -24,3 +24,5 @@ test:
     script:
         - rustc --version && cargo --version # Print version info for debugging
         - cargo test --verbose --jobs 1 --release # Don't parallelize to make errors more readable
+        - cargo install rustfmt || true
+        - cargo fmt -- --write-mode=diff
