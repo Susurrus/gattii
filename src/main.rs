@@ -4,28 +4,18 @@ extern crate argparse;
 extern crate core;
 extern crate gtk;
 extern crate glib;
-extern crate serial;
 
-use core::num;
-use std::boxed::Box;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
-use std::io;
-use std::path::PathBuf;
 use std::process;
 use std::string::String;
-use std::sync::mpsc;
-use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
-use std::thread;
-use std::time::Duration;
 
 use argparse::{ArgumentParser, Store};
 use gtk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
-use serial::BaudRate;
-use serial::prelude::*;
+
+mod serial_thread;
+use serial_thread::*;
 
 // make moving clones into closures more convenient
 // Taken from: https://github.com/gtk-rs/examples/blob/pending/src/cairo_threads.rs#L17
@@ -50,39 +40,13 @@ macro_rules! clone {
 enum ExitCode {
     ArgumentError = 1,
     BadPort,
-    ConfigurationError
+    ConfigurationError,
 }
 
 #[derive(Debug)]
 pub struct Error {
     code: ExitCode,
-    description: String
-}
-
-enum SerialCommand {
-    ConnectToPort { name: String, baud: usize },
-    ChangeBaud(usize),
-    ChangePort(String),
-    Disconnect,
-    SendData(Vec<u8>),
-    SendFile(PathBuf),
-    CancelSendFile
-}
-
-enum SerialResponse {
-    Data(Vec<u8>),
-    SendingFileCanceled,
-    SendingFileComplete,
-    SendingFileError(String),
-    OpenPortSuccess,
-    OpenPortError(String),
-    DisconnectSuccess
-}
-
-enum GeneralError {
-    Io(io::Error),
-    Parse(num::ParseIntError),
-    Send(mpsc::SendError<SerialCommand>)
+    description: String,
 }
 
 struct Ui {
@@ -91,67 +55,13 @@ struct Ui {
     text_buffer: gtk::TextBuffer,
     open_button: gtk::ToggleToolButton,
     file_button: gtk::ToggleToolButton,
-    text_view_insert_signal: u64
+    text_view_insert_signal: u64,
 }
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(Ui, Sender<SerialCommand>, Receiver<SerialResponse>)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(Ui, SerialThread)>> = RefCell::new(None)
 );
-
-fn send_port_open_cmd(tx: &Sender<SerialCommand>, port_name: String, baud_rate: String) -> Result<(), GeneralError> {
-    let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
-    try!(tx.send(SerialCommand::ConnectToPort { name: port_name, baud: baud_rate }).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_port_close_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_port_change_baud_cmd(tx: &Sender<SerialCommand>, baud_rate: String) -> Result<(), GeneralError> {
-    let baud_rate : usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
-    try!(tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_port_change_port_cmd(tx: &Sender<SerialCommand>, port_name: String) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_port_data_cmd(tx: &Sender<SerialCommand>, data: Vec<u8>) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_port_file_cmd(tx: &Sender<SerialCommand>, path: PathBuf) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn send_cancel_file_cmd(tx: &Sender<SerialCommand>) -> Result<(), GeneralError> {
-    try!(tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
-    Ok(())
-}
-
-fn open_port(port_name: String, baud_rate: usize) -> serial::Result<Box<serial::SystemPort>> {
-    // Open the specified serial port
-    let mut port = try!(serial::open(&port_name));
-
-    // Configure the port settings
-    try!(port.reconfigure(&|settings| {
-        try!(settings.set_baud_rate(BaudRate::from_speed(baud_rate)));
-        settings.set_char_size(serial::Bits8);
-        settings.set_parity(serial::ParityNone);
-        settings.set_stop_bits(serial::Stop1);
-        settings.set_flow_control(serial::FlowNone);
-        Ok(())
-    }));
-
-    Ok(Box::new(port))
-}
 
 fn main() {
     // Store command-line arguments
@@ -256,8 +166,6 @@ fn main() {
     window.add(&vbox);
 
     // Set up channels for communicating with the port thread.
-    let (from_port_chan_tx, from_port_chan_rx) = channel();
-    let (to_port_chan_tx, to_port_chan_rx) = channel();
     let buffer = text_view.get_buffer().unwrap();
     let ui = Ui {
         window: window.clone(),
@@ -268,144 +176,21 @@ fn main() {
         text_view_insert_signal: 0
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui, to_port_chan_tx, from_port_chan_rx))
-    });
-
-    // Open a thread to monitor the active serial channel. This thread is always-running and listening
-    // for various port-related commands, but is not necessarily always connected to the port.
-    thread::spawn(move || {
-        let mut port : Option<Box<serial::SystemPort>> = None;
-        let mut port_settings : serial::PortSettings = serial::PortSettings{
-            baud_rate: serial::Baud115200,
-            char_size: serial::Bits8,
-            parity: serial::ParityNone,
-            stop_bits: serial::Stop1,
-            flow_control: serial::FlowNone
-        };
-        let mut read_file : Option<Box<File>> = None;
-        let tick_rate = 10; // In milliseconds
-
-        let mut serial_buf: Vec<u8> = vec![0; 1000];
-        let mut serial_buf_rx = [0; 1000];
-        loop {
-            // First check if we have any incoming commands
-            match to_port_chan_rx.try_recv() {
-                Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                    println!("Connecting to {} at {}", &name, baud);
-                    if let Ok(p) = open_port(name.clone(), baud) {
-                        port = Some(p);
-                        from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
-                    } else {
-                        from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
-                    }
-                    glib::idle_add(receive);
-                },
-                Ok(SerialCommand::ChangeBaud(baud)) => {
-                    if let Some(ref mut p) = port {
-                        println!("Changing baud to {}", baud);
-                        let baud_rate = BaudRate::from_speed(baud);
-                        p.reconfigure(&|s| {
-                            s.set_baud_rate(baud_rate).unwrap();
-                            Ok(())
-                        }).unwrap();
-                        port_settings.set_baud_rate(baud_rate).unwrap();
-                    }
-                },
-                Ok(SerialCommand::ChangePort(name)) => {
-                    println!("Changing port to {}", name);
-                    let mut p = Box::new(serial::open(&name).unwrap());
-                    p.configure(&port_settings).unwrap();
-                    port = Some(p);
-                },
-                Ok(SerialCommand::Disconnect) => {
-                    println!("Disconnecting");
-                    port = None;
-                    read_file = None;
-                    from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
-                    glib::idle_add(receive);
-                },
-                Ok(SerialCommand::SendData(d)) => {
-                    if let Some(ref mut p) = port {
-                        match p.write(d.as_ref()) {
-                            Ok(_) => (),
-                            Err(e) => println!("Error in SendData: {:?}", e)
-                        }
-                    }
-                },
-                Ok(SerialCommand::SendFile(f)) => {
-                    if let Some(_) = port {
-                        println!("Sending file {:?}", f);
-                        if let Ok(new_file) = File::open(f) {
-                            read_file = Some(Box::new(new_file));
-                        }
-                    } else {
-                        from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
-                        glib::idle_add(receive);
-                    }
-                },
-                Ok(SerialCommand::CancelSendFile) => {
-                    read_file = None;
-                    from_port_chan_tx.send(SerialResponse::SendingFileCanceled).unwrap();
-                    glib::idle_add(receive);
-                },
-                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => ()
-            }
-
-            if let Some(ref mut p) = port {
-                let rx_data_len = match p.read(serial_buf.as_mut_slice()) {
-                    Ok(t) => t,
-                    Err(_) => 0
-                };
-                if rx_data_len > 0 {
-                    let send_data = SerialResponse::Data(serial_buf[..rx_data_len].to_vec());
-                    from_port_chan_tx.send(send_data).unwrap();
-                    glib::idle_add(receive);
-                }
-
-                // If a file has been opened, read the next 1ms of data from it as
-                // determined by the current baud rate.
-                let mut read_len : usize = 0;
-                if let Some(ref mut file) = read_file {
-                    let mut byte_as_serial_bits = 1 + 8;
-                    if port_settings.parity != serial::ParityNone {
-                        byte_as_serial_bits += 1;
-                    }
-                    if port_settings.stop_bits == serial::Stop1 {
-                        byte_as_serial_bits += 1;
-                    } else if port_settings.stop_bits == serial::Stop2 {
-                        byte_as_serial_bits += 2;
-                    }
-                    let tx_data_len = port_settings.baud_rate.speed() / byte_as_serial_bits / (1000 / tick_rate);
-                    if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
-                        read_len = len;
-                    } else {
-                        println!("Failed to read {} bytes", tx_data_len);
-                    }
-                }
-                if read_len > 0 {
-                    if let Err(_) = p.write(&serial_buf_rx[..read_len]) {
-                        println!("Failed to send {} bytes", read_len);
-                        read_file = None;
-                    }
-                } else if read_file.is_some() {
-                    read_file = None;
-                    from_port_chan_tx.send(SerialResponse::SendingFileComplete).unwrap();
-                    glib::idle_add(receive);
-                }
-            }
-
-            thread::sleep(Duration::from_millis(tick_rate as u64));
-        }
+        *global.borrow_mut() = Some((ui, SerialThread::new(|| {glib::idle_add(receive);})))
     });
 
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _)) = *global.borrow() {
-                    match send_port_change_baud_cmd(tx, baud_rate.clone()) {
-                        Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
-                        Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                        Err(_) | Ok(_) => ()
+                if let Some((_, ref serial_thread)) = *global.borrow() {
+                    match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                        Err(GeneralError::Parse(_)) => {
+                            println!("Invalid baud rate '{}' specified.", &baud_rate)
+                        }
+                        Err(GeneralError::Send(_)) => {
+                            println!("Error sending port_open command to child thread. Aborting.")
+                        }
+                        Err(_) | Ok(_) => (),
                     }
                 }
             });
@@ -415,11 +200,15 @@ fn main() {
     ports_selector.connect_changed(move |s| {
         if let Some(port_name) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _)) = *global.borrow() {
-                    match send_port_change_port_cmd(tx, port_name.clone()) {
-                        Err(GeneralError::Parse(_)) => println!("Invalid port name '{}' specified.", &port_name),
-                        Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                        Err(_) | Ok(_) => ()
+                if let Some((_, ref serial_thread)) = *global.borrow() {
+                    match serial_thread.send_port_change_port_cmd(port_name.clone()) {
+                        Err(GeneralError::Parse(_)) => {
+                            println!("Invalid port name '{}' specified.", &port_name)
+                        }
+                        Err(GeneralError::Send(_)) => {
+                            println!("Error sending port_open command to child thread. Aborting.")
+                        }
+                        Err(_) | Ok(_) => (),
                     }
                 }
             });
@@ -431,8 +220,8 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref tx, _)) = *global.borrow() {
-                            match send_port_open_cmd(tx, port_name, baud_rate.clone()) {
+                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                            match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
                                 Err(_) | Ok(_) => ()
@@ -443,8 +232,8 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, ref tx, _)) = *global.borrow() {
-                    match send_port_close_cmd(tx) {
+                if let Some((_, ref serial_thread)) = *global.borrow() {
+                    match serial_thread.send_port_close_cmd() {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
                     }
@@ -454,59 +243,62 @@ fn main() {
     }));
 
     GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            let window = &mut ui.window;
-            ui.file_button.connect_toggled(clone!(window => move |s| {
-                if s.get_active() {
-                    let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(&window), gtk::FileChooserAction::Open);
-                    dialog.add_buttons(&[
-                        ("Send", gtk::ResponseType::Ok.into()),
-                        ("Cancel", gtk::ResponseType::Cancel.into()),
-                    ]);
-                    let result = dialog.run();
-                    if result == gtk::ResponseType::Ok.into() {
-                        let filename = dialog.get_filename().unwrap();
-                        GLOBAL.with(|global| {
-                            if let Some((_, ref tx, _)) = *global.borrow() {
-                                match send_port_file_cmd(tx, filename) {
-                                    Err(GeneralError::Send(_)) => {
-                                        println!("Error sending port_file command to child thread. Aborting.");
-                                        s.set_sensitive(true);
-                                        s.set_active(false);
-                                    },
-                                    Err(_) | Ok(_) => ()
-                                }
+        if let Some((ref ui, _)) = *global.borrow() {
+            ui.file_button.connect_toggled(|s| {
+                GLOBAL.with(|global| {
+                    if let Some((ref ui, ref serial_thread)) = *global.borrow() {
+                        let window = &ui.window;
+                        let view = &ui.text_view;
+                        if s.get_active() {
+                            let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(window), gtk::FileChooserAction::Open);
+                            dialog.add_buttons(&[
+                                ("Send", gtk::ResponseType::Ok.into()),
+                                ("Cancel", gtk::ResponseType::Cancel.into()),
+                            ]);
+                            let result = dialog.run();
+                            if result == gtk::ResponseType::Ok.into() {
+                                let filename = dialog.get_filename().unwrap();
+                                GLOBAL.with(|global| {
+                                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                                        match serial_thread.send_port_file_cmd(filename) {
+                                            Err(_) => {
+                                                println!("Error sending port_file command to child thread. Aborting.");
+                                                s.set_sensitive(true);
+                                                s.set_active(false);
+                                            },
+                                            Ok(_) => view.set_editable(false)
+                                        }
+                                    }
+                                });
                             }
-                        });
-                    }
 
-                    dialog.destroy();
-                } else {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref tx, _)) = *global.borrow() {
-                            match send_cancel_file_cmd(tx) {
+                            dialog.destroy();
+                        } else {
+                            match serial_thread.send_cancel_file_cmd() {
                                 Err(GeneralError::Send(_)) => {
                                     println!("Error sending cancel_file command to child thread. Aborting.");
                                 },
                                 Err(_) | Ok(_) => ()
                             }
                         }
-                    });
-                }
-            }));
+                    }
+                });
+            });
         }
     });
 
     GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
+        if let Some((ref mut ui, _)) = *global.borrow_mut() {
             let b = &ui.text_buffer;
             ui.text_view_insert_signal = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, ref tx, _)) = *global.borrow() {
+                    if let Some((_, ref serial_thread)) = *global.borrow() {
                         let v = Vec::from(text);
-                        match send_port_data_cmd(tx, v) {
-                            Err(GeneralError::Send(_)) => println!("Error sending data command to child thread. Aborting."),
-                            Err(_) | Ok(_) => ()
+                        match serial_thread.send_port_data_cmd(v) {
+                            Err(GeneralError::Send(_)) => {
+                                println!("Error sending data command to child thread. Aborting.")
+                            }
+                            Err(_) | Ok(_) => (),
                         }
                     }
                 });
@@ -517,7 +309,7 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((ref ui, _, _)) = *global.borrow() {
+        if let Some((ref ui, _)) = *global.borrow() {
             let b = &ui.text_buffer;
             b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
@@ -549,7 +341,7 @@ fn main() {
     }
 
     GLOBAL.with(|global| {
-        if let Some((ref ui, _, _)) = *global.borrow() {
+        if let Some((ref ui, _)) = *global.borrow() {
             let window = &ui.window;
             window.connect_delete_event(|_, _| {
                 gtk::main_quit();
@@ -565,12 +357,12 @@ fn main() {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref ui, _, ref rx)) = *global.borrow() {
+        if let Some((ref ui, ref serial_thread)) = *global.borrow() {
             let window = &ui.window;
             let view = &ui.text_view;
             let buf = &ui.text_buffer;
             let f_button = &ui.file_button;
-            match rx.try_recv() {
+            match serial_thread.from_port_chan_rx.try_recv() {
                 Ok(SerialResponse::Data(data)) => {
 
                     // Don't know why this needs to be this complicated, but found
