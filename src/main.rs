@@ -38,9 +38,7 @@ macro_rules! clone {
 
 #[derive(Debug)]
 enum ExitCode {
-    ArgumentError = 1,
-    BadPort,
-    ConfigurationError,
+    ArgumentError = 1
 }
 
 #[derive(Debug)]
@@ -53,7 +51,6 @@ struct Ui {
     window: gtk::Window,
     text_view: gtk::TextView,
     text_buffer: gtk::TextBuffer,
-    open_button: gtk::ToggleToolButton,
     file_button: gtk::ToggleToolButton,
     text_view_insert_signal: u64,
 }
@@ -143,7 +140,6 @@ fn main() {
     let open_button = gtk::ToggleToolButton::new();
     open_button.set_icon_name(Some("media-playback-start"));
     open_button.set_is_important(true);
-    toolbar.add(&open_button);
 
     // Set up an auto-scrolling text view
     let text_view = gtk::TextView::new();
@@ -182,7 +178,6 @@ fn main() {
         window: window.clone(),
         text_view: text_view.clone(),
         text_buffer: buffer.clone(),
-        open_button: open_button.clone(),
         file_button: send_file_button.clone(),
         text_view_insert_signal: 0,
     };
@@ -204,7 +199,7 @@ fn main() {
                         Err(GeneralError::Send(_)) => {
                             println!("Error sending port_open command to child thread. Aborting.")
                         }
-                        Err(_) | Ok(_) => (),
+                        Ok(_) => (),
                     }
                 }
             });
@@ -222,7 +217,7 @@ fn main() {
                         Err(GeneralError::Send(_)) => {
                             println!("Error sending port_open command to child thread. Aborting.")
                         }
-                        Err(_) | Ok(_) => (),
+                        Ok(_) => (),
                     }
                 }
             });
@@ -238,7 +233,7 @@ fn main() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
-                                Err(_) | Ok(_) => ()
+                                Ok(_) => ()
                             }
                         }
                     });
@@ -380,7 +375,7 @@ fn receive() -> glib::Continue {
                     f_button.set_active(false);
                     view.set_editable(true);
                 }
-                Ok(SerialResponse::SendingFileError(s)) => {
+                Ok(SerialResponse::SendingFileError(_)) => {
                     f_button.set_active(false);
                     view.set_editable(true);
                     let dialog = gtk::MessageDialog::new(Some(window),
