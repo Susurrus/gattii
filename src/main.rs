@@ -258,46 +258,7 @@ fn main() {
 
     GLOBAL.with(|global| {
         if let Some((ref ui, _)) = *global.borrow() {
-            ui.file_button.connect_toggled(|s| {
-                GLOBAL.with(|global| {
-                    if let Some((ref ui, ref serial_thread)) = *global.borrow() {
-                        let window = &ui.window;
-                        let view = &ui.text_view;
-                        if s.get_active() {
-                            let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(window), gtk::FileChooserAction::Open);
-                            dialog.add_buttons(&[
-                                ("Send", gtk::ResponseType::Ok.into()),
-                                ("Cancel", gtk::ResponseType::Cancel.into()),
-                            ]);
-                            let result = dialog.run();
-                            if result == gtk::ResponseType::Ok.into() {
-                                let filename = dialog.get_filename().unwrap();
-                                GLOBAL.with(|global| {
-                                    if let Some((_, ref serial_thread)) = *global.borrow() {
-                                        match serial_thread.send_port_file_cmd(filename) {
-                                            Err(_) => {
-                                                println!("Error sending port_file command to child thread. Aborting.");
-                                                s.set_sensitive(true);
-                                                s.set_active(false);
-                                            },
-                                            Ok(_) => view.set_editable(false)
-                                        }
-                                    }
-                                });
-                            }
-
-                            dialog.destroy();
-                        } else {
-                            match serial_thread.send_cancel_file_cmd() {
-                                Err(GeneralError::Send(_)) => {
-                                    println!("Error sending cancel_file command to child thread. Aborting.");
-                                },
-                                Err(_) | Ok(_) => ()
-                            }
-                        }
-                    }
-                });
-            });
+            ui.file_button.connect_toggled(file_button_connect_toggled);
         }
     });
 
@@ -435,4 +396,45 @@ fn receive() -> glib::Continue {
         }
     });
     glib::Continue(false)
+}
+
+fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
+    GLOBAL.with(|global| {
+        if let Some((ref ui, ref serial_thread)) = *global.borrow() {
+		let window = &ui.window;
+		let view = &ui.text_view;
+		if b.get_active() {
+		    let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(window), gtk::FileChooserAction::Open);
+		    dialog.add_buttons(&[
+		        ("Send", gtk::ResponseType::Ok.into()),
+		        ("Cancel", gtk::ResponseType::Cancel.into()),
+		    ]);
+		    let result = dialog.run();
+		    if result == gtk::ResponseType::Ok.into() {
+		        let filename = dialog.get_filename().unwrap();
+		        GLOBAL.with(|global| {
+		            if let Some((_, ref serial_thread)) = *global.borrow() {
+		                match serial_thread.send_port_file_cmd(filename) {
+		                    Err(_) => {
+		                        println!("Error sending port_file command to child thread. Aborting.");
+		                        b.set_sensitive(true);
+		                        b.set_active(false);
+		                    },
+		                    Ok(_) => view.set_editable(false)
+		                }
+		            }
+		        });
+		    }
+
+		    dialog.destroy();
+		} else {
+		    match serial_thread.send_cancel_file_cmd() {
+		        Err(GeneralError::Send(_)) => {
+		            println!("Error sending cancel_file command to child thread. Aborting.");
+		        },
+		        Err(_) | Ok(_) => ()
+		    }
+		}
+        }
+    });
 }
