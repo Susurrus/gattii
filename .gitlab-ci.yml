@@ -4,6 +4,13 @@ stages:
     - build
     - test
 
+variables:
+    CARGO_HOME: $CI_PROJECT_DIR/cargo
+
+cache:
+    paths:
+        - cargo/
+
 before_script:
     - apt-get -qq update && apt-get -qq -y install libudev-dev libgtk-3-dev
 
