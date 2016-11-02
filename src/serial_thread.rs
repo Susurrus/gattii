@@ -2,7 +2,6 @@ extern crate serial;
 
 use core::num;
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -34,7 +33,6 @@ pub enum SerialResponse {
 }
 
 pub enum GeneralError {
-    Io(io::Error),
     Parse(num::ParseIntError),
     Send(mpsc::SendError<SerialCommand>),
 }
@@ -77,7 +75,7 @@ impl SerialThread {
                         println!("Connecting to {} at {}", &name, baud);
                         if let Ok(mut p) = open_port(name.clone(), baud) {
                             // Set the timeout to 1ms to keep a tight event loop
-                            p.set_timeout(Duration::from_millis(1));
+                            p.set_timeout(Duration::from_millis(1)).unwrap();
                             port = Some(p);
                             from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
                         } else {
