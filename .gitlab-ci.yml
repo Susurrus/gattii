@@ -6,9 +6,11 @@ stages:
 
 variables:
     CARGO_HOME: $CI_PROJECT_DIR/cargo
+    APT_CACHE_DIR: apt-cache
 
 cache:
     paths:
+        - apt-cache/
         - cargo/
 
 before_script:
