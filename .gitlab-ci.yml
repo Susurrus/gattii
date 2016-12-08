@@ -35,4 +35,4 @@ test:
     script:
         - rustc --version && cargo --version # Print version info for debugging
         - cargo test --verbose --jobs 1 --release # Don't parallelize to make errors more readable
-        - cargo install rustfmt && PATH="$PATH:$HOME/.cargo/bin" cargo fmt -- --write-mode=diff
+        - cargo install rustfmt && PATH="$PATH:$CI_PROJECT_DIR/cargo/bin" cargo fmt -- --write-mode=diff
