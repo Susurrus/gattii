@@ -150,7 +150,7 @@ fn main() {
     scroll.add(&text_view);
 
     let css_style_provider = gtk::CssProvider::new();
-    let style = "GtkTextView { font: Monospace 11 }";
+    let style = "GtkTextView { font: 11pt monospace }";
     css_style_provider.load_from_data(style).unwrap();
     let text_view_style_context = text_view.get_style_context().unwrap();
     text_view_style_context.add_provider(&css_style_provider,
