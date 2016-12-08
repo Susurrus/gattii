@@ -38,7 +38,7 @@ macro_rules! clone {
 
 #[derive(Debug)]
 enum ExitCode {
-    ArgumentError = 1
+    ArgumentError = 1,
 }
 
 #[derive(Debug)]
@@ -184,8 +184,8 @@ fn main() {
     GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((ui,
                                      SerialThread::new(|| {
-            glib::idle_add(receive);
-        })))
+                                         glib::idle_add(receive);
+                                     })))
     });
 
     baud_selector.connect_changed(move |s| {
@@ -396,18 +396,18 @@ fn receive() -> glib::Continue {
 fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
     GLOBAL.with(|global| {
         if let Some((ref ui, ref serial_thread)) = *global.borrow() {
-		let window = &ui.window;
-		let view = &ui.text_view;
-		if b.get_active() {
-		    let dialog = gtk::FileChooserDialog::new(Some("Send File"), Some(window), gtk::FileChooserAction::Open);
-		    dialog.add_buttons(&[
-		        ("Send", gtk::ResponseType::Ok.into()),
-		        ("Cancel", gtk::ResponseType::Cancel.into()),
-		    ]);
-		    let result = dialog.run();
-		    if result == gtk::ResponseType::Ok.into() {
-		        let filename = dialog.get_filename().unwrap();
-		        GLOBAL.with(|global| {
+            let window = &ui.window;
+            let view = &ui.text_view;
+            if b.get_active() {
+                let dialog = gtk::FileChooserDialog::new(Some("Send File"),
+                                                         Some(window),
+                                                         gtk::FileChooserAction::Open);
+                dialog.add_buttons(&[("Send", gtk::ResponseType::Ok.into()),
+                                     ("Cancel", gtk::ResponseType::Cancel.into())]);
+                let result = dialog.run();
+                if result == gtk::ResponseType::Ok.into() {
+                    let filename = dialog.get_filename().unwrap();
+                    GLOBAL.with(|global| {
 		            if let Some((_, ref serial_thread)) = *global.borrow() {
 		                match serial_thread.send_port_file_cmd(filename) {
 		                    Err(_) => {
@@ -419,17 +419,17 @@ fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
 		                }
 		            }
 		        });
-		    }
+                }
 
-		    dialog.destroy();
-		} else {
-		    match serial_thread.send_cancel_file_cmd() {
-		        Err(GeneralError::Send(_)) => {
-		            println!("Error sending cancel_file command to child thread. Aborting.");
-		        },
-		        Err(_) | Ok(_) => ()
-		    }
-		}
+                dialog.destroy();
+            } else {
+                match serial_thread.send_cancel_file_cmd() {
+                    Err(GeneralError::Send(_)) => {
+                        println!("Error sending cancel_file command to child thread. Aborting.");
+                    }
+                    Err(_) | Ok(_) => (),
+                }
+            }
         }
     });
 }
