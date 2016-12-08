@@ -10,6 +10,6 @@ keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 
 [dependencies]
 argparse = "0.2"
-gtk = { git = "https://github.com/gtk-rs/gtk" }
-glib = { git = "https://github.com/gtk-rs/glib" }
+gtk = "0.1"
+glib = "0.1"
 serial = { git = "https://github.com/susurrus/serial-rs" }
