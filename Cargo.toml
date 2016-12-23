@@ -6,7 +6,7 @@ keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 license = "GPL-3.0"
 readme = "README.rst"
 repository = "https://gitlab.com/susurrus/gattii"
-description = "Rust program for reading data from serial ports."
+description = "Cross platform GUI (GTK-based) serial terminal"
 
 [dependencies]
 argparse = "0.2"
