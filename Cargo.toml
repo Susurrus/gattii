@@ -12,4 +12,4 @@ keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 argparse = "0.2"
 gtk = "0.1"
 glib = "0.1"
-serialport = { git = "https://gitlab.com/susurrus/serialport-rs.git" }
+serialport = "0.1"
