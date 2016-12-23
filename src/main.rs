@@ -140,6 +140,7 @@ fn main() {
     let open_button = gtk::ToggleToolButton::new();
     open_button.set_icon_name(Some("media-playback-start"));
     open_button.set_is_important(true);
+    toolbar.add(&open_button);
 
     // Set up an auto-scrolling text view
     let text_view = gtk::TextView::new();
