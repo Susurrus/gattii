@@ -52,6 +52,7 @@ struct Ui {
     text_view: gtk::TextView,
     text_buffer: gtk::TextBuffer,
     file_button: gtk::ToggleToolButton,
+    open_button: gtk::ToggleToolButton,
     text_view_insert_signal: u64,
 }
 
@@ -179,6 +180,7 @@ fn main() {
         window: window.clone(),
         text_view: text_view.clone(),
         text_buffer: buffer.clone(),
+        open_button: open_button.clone(),
         file_button: send_file_button.clone(),
         text_view_insert_signal: 0,
     };
@@ -333,6 +335,7 @@ fn receive() -> glib::Continue {
             let view = &ui.text_view;
             let buf = &ui.text_buffer;
             let f_button = &ui.file_button;
+            let o_button = &ui.open_button;
             match serial_thread.from_port_chan_rx.try_recv() {
                 Ok(SerialResponse::Data(data)) => {
 
@@ -369,6 +372,7 @@ fn receive() -> glib::Continue {
                     dialog.run();
                     dialog.destroy();
                     f_button.set_sensitive(false);
+                    o_button.set_active(false);
                 }
                 Ok(SerialResponse::SendingFileComplete) |
                 Ok(SerialResponse::SendingFileCanceled) => {
