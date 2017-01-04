@@ -87,17 +87,23 @@ impl SerialThread {
                     },
                     Ok(SerialCommand::ChangePort(name)) => {
                         println!("Changing port to {}", name);
-                        let baud_rate = match port {
-                            Some(p) => p.baud_rate(),
+                        // If there is an existing port, grab the baud rate from iter
+                        let settings = match port.as_ref() {
+                            Some(p) => Some(p.settings()),
                             None => None
                         };
-                        let mut p = serialport::open(&name).unwrap();
-                        match baud_rate {
-                            Some(b) => p.set_baud_rate(b).unwrap(),
-                            None => ()
-                        }
-                        port = Some(p);
-                    }
+
+                        // Open a new port
+                        match serialport::open(&name) {
+                            Ok(mut p) => {
+                                if let Some(s) = settings {
+                                    p.set_all(s).expect("Failed to apply all settings")
+                                }
+                                port = Some(p);
+                            },
+                            Err(_) => from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap()
+                        };
+                    },
                     Ok(SerialCommand::Disconnect) => {
                         println!("Disconnecting");
                         port = None;
