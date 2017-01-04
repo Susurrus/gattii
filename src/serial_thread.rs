@@ -77,14 +77,14 @@ impl SerialThread {
                             from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
                         }
                         callback();
-                    }
+                    },
                     Ok(SerialCommand::ChangeBaud(baud)) => {
                         if let Some(ref mut p) = port {
                             println!("Changing baud to {}", baud);
                             let baud_rate = BaudRate::from_speed(baud);
                             p.set_baud_rate(baud_rate).unwrap();
                         }
-                    }
+                    },
                     Ok(SerialCommand::ChangePort(name)) => {
                         println!("Changing port to {}", name);
                         let baud_rate = match port {
@@ -104,7 +104,7 @@ impl SerialThread {
                         read_file = None;
                         from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
                         callback();
-                    }
+                    },
                     Ok(SerialCommand::SendData(d)) => {
                         if let Some(ref mut p) = port {
                             match p.write(d.as_ref()) {
@@ -112,7 +112,7 @@ impl SerialThread {
                                 Err(e) => println!("Error in SendData: {:?}", e),
                             }
                         }
-                    }
+                    },
                     Ok(SerialCommand::SendFile(f)) => {
                         if let Some(_) = port {
                             println!("Sending file {:?}", f);
@@ -123,12 +123,12 @@ impl SerialThread {
                             from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
                             callback();
                         }
-                    }
+                    },
                     Ok(SerialCommand::CancelSendFile) => {
                         read_file = None;
                         from_port_chan_tx.send(SerialResponse::SendingFileCanceled).unwrap();
                         callback();
-                    }
+                    },
                     Err(TryRecvError::Empty) |
                     Err(TryRecvError::Disconnected) => (),
                 }
