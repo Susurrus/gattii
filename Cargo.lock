@@ -1,6 +1,6 @@
 [root]
 name = "gattii"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -305,7 +305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "serialport"
 version = "0.1.1"
-source = "git+https://gitlab.com/susurrus/serialport-rs.git?branch=0_2_0#8e62f01f23dc34cb6859bea0a7b1c618d318f447"
+source = "git+https://gitlab.com/susurrus/serialport-rs.git?branch=0_2_0#8ec9e602d03e3784af2a2123f76892be1d356a19"
 dependencies = [
  "ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
