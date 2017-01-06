@@ -1,0 +1,15 @@
+== Change log
+
+All notable changes to this project will be documented in this file.
+
+The format is based on http://keepachangelog.com/[Keep a Changelog]
+and this project adheres to http://semver.org/[Semantic Versioning].
+
+=== Unreleased
+* Fixed open button only looking pressed when port is open
+* Improved user error messages on bad connections
+* Switched from serial-rs to serialport-rs library
+
+=== [0.1.0] - 2016-12-22
+==== Added
+* Initial release.
