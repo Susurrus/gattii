@@ -220,7 +220,7 @@ fn main() {
                             println!("Invalid port name '{}' specified.", &port_name)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending port_open command to child thread. Aborting.")
+                            println!("Error sending change_port command to child thread. Aborting.")
                         }
                         Ok(_) => (),
                     }
