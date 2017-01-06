@@ -92,23 +92,28 @@ impl SerialThread {
                         }
                     },
                     Ok(SerialCommand::ChangePort(name)) => {
-                        println!("Changing port to {}", name);
-                        // If there is an existing port, grab the baud rate from iter
-                        let settings = match port.as_ref() {
-                            Some(p) => Some(p.settings()),
-                            None => None
-                        };
+                        // If there is an existing port, copy the settings from
+                        // the existing port to a new one.
+                        if port.is_some() {
+                            println!("Changing port to '{}'", &name);
+                            let settings = match port.as_ref() {
+                                Some(p) => Some(p.settings()),
+                                None => None
+                            };
 
-                        // Open a new port
-                        match serialport::open(&name) {
-                            Ok(mut p) => {
-                                if let Some(s) = settings {
-                                    p.set_all(s).expect("Failed to apply all settings")
+                            match serialport::open(&name) {
+                                Ok(mut p) => {
+                                    if let Some(s) = settings {
+                                        p.set_all(s).expect("Failed to apply all settings");
+                                    }
+                                    port = Some(p);
+                                },
+                                Err(e) => {
+                                    println!("{:?}", e);
+                                    from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap()
                                 }
-                                port = Some(p);
-                            },
-                            Err(_) => from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap()
-                        };
+                            }
+                        }
                     },
                     Ok(SerialCommand::Disconnect) => {
                         println!("Disconnecting");
