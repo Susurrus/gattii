@@ -68,13 +68,19 @@ impl SerialThread {
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
                         println!("Connecting to {} at {}", &name, baud);
-                        if let Ok(mut p) = open_port(name.clone(), baud) {
-                            // Set the timeout to 1ms to keep a tight event loop
-                            p.set_timeout(Duration::from_millis(1)).unwrap();
-                            port = Some(p);
-                            from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
-                        } else {
-                            from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
+                        match open_port(name.clone(), baud) {
+                            Ok(mut p) => {
+                                // Set the timeout to 1ms to keep a tight event loop
+                                p.set_timeout(Duration::from_millis(1)).unwrap();
+                                port = Some(p);
+                                from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
+                            },
+                            Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
+                                from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Port '{}' is already in use or doesn't exist", &name)))).unwrap();
+                            },
+                            Err(e) => {
+                                from_port_chan_tx.send(SerialResponse::OpenPortError(e.description)).unwrap();
+                            }
                         }
                         callback();
                     },
