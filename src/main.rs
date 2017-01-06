@@ -236,8 +236,10 @@ fn main() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref serial_thread)) = *global.borrow() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
-                                Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                                Err(GeneralError::Parse(_)) =>
+                                    println!("Invalid baud rate '{}' specified.", &baud_rate),
+                                Err(GeneralError::Send(_)) =>
+                                    println!("Error sending port_open command to child thread. Aborting."),
                                 Ok(_) => ()
                             }
                         }
