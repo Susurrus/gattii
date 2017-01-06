@@ -374,7 +374,7 @@ fn receive() -> glib::Continue {
                                                          gtk::DIALOG_DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
-                                                         "Error opening port");
+                                                         &s);
                     dialog.run();
                     dialog.destroy();
                     f_button.set_sensitive(false);
