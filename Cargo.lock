@@ -305,7 +305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "serialport"
 version = "0.1.1"
-source = "git+https://gitlab.com/susurrus/serialport-rs.git?branch=0_2_0#8ec9e602d03e3784af2a2123f76892be1d356a19"
+source = "git+https://gitlab.com/susurrus/serialport-rs.git?branch=0_2_0#32204b4279113f9cf8e3cde77077ec54a2f6fa11"
 dependencies = [
  "ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
