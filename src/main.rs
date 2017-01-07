@@ -97,7 +97,8 @@ fn main() {
     let toolbar = gtk::Toolbar::new();
     let ports_selector = gtk::ComboBoxText::new();
     let mut ports_selector_map = HashMap::new();
-    if let Ok(ports) = serial_thread::list_ports() {
+    if let Ok(mut ports) = serial_thread::list_ports() {
+        ports.sort();
         if ports.len() > 0 {
             let mut i: i32 = 0;
             for p in ports {
