@@ -4,7 +4,9 @@ Gattii
 |crate badge| |docs badge|
 
 .. |crate badge| image:: https://img.shields.io/crates/v/gattii.svg
+                 :target: https://crates.io/crates/gattii
 .. |docs badge| image:: https://docs.rs/gattii/badge.svg
+                :target: https://docs.rs/crate/gattii
 
 Gattii is a serial terminal emulator that allows one to use a serial port for transmitting and receiving data. This project grew out of my desire to learn Rust_. It aims to replace RealTerm_, and as such provide a very similar set of functionality. Realterm was invaluable in my robotics work with microcontrollers, but is not actively maintained, difficult to contribute to and improve, and full of bugs, both crashers and usability related.
 
