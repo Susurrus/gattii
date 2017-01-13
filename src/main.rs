@@ -54,6 +54,7 @@ struct Ui {
     file_button: gtk::ToggleToolButton,
     open_button: gtk::ToggleToolButton,
     text_view_insert_signal: u64,
+    open_button_clicked_signal: u64
 }
 
 // declare a new thread local storage key
@@ -96,7 +97,8 @@ fn main() {
     let toolbar = gtk::Toolbar::new();
     let ports_selector = gtk::ComboBoxText::new();
     let mut ports_selector_map = HashMap::new();
-    if let Ok(ports) = serial_thread::list_ports() {
+    if let Ok(mut ports) = serial_thread::list_ports() {
+        ports.sort();
         if ports.len() > 0 {
             let mut i: i32 = 0;
             for p in ports {
@@ -183,6 +185,7 @@ fn main() {
         open_button: open_button.clone(),
         file_button: send_file_button.clone(),
         text_view_insert_signal: 0,
+        open_button_clicked_signal: 0
     };
     GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((ui,
@@ -218,7 +221,7 @@ fn main() {
                             println!("Invalid port name '{}' specified.", &port_name)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending port_open command to child thread. Aborting.")
+                            println!("Error sending change_port command to child thread. Aborting.")
                         }
                         Ok(_) => (),
                     }
@@ -227,15 +230,17 @@ fn main() {
         }
     });
 
-    open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
+    let open_button_clicked_signal = open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
         if s.get_active() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref serial_thread)) = *global.borrow() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => println!("Invalid baud rate '{}' specified.", &baud_rate),
-                                Err(GeneralError::Send(_)) => println!("Error sending port_open command to child thread. Aborting."),
+                                Err(GeneralError::Parse(_)) =>
+                                    println!("Invalid baud rate '{}' specified.", &baud_rate),
+                                Err(GeneralError::Send(_)) =>
+                                    println!("Error sending port_open command to child thread. Aborting."),
                                 Ok(_) => ()
                             }
                         }
@@ -277,6 +282,7 @@ fn main() {
                 });
                 signal_stop_emission_by_name(b, "insert-text");
             });
+            ui.open_button_clicked_signal = open_button_clicked_signal;
         }
     });
 
@@ -361,6 +367,7 @@ fn receive() -> glib::Continue {
                 }
                 Ok(SerialResponse::OpenPortSuccess) => {
                     f_button.set_sensitive(true);
+                    o_button.set_active(true);
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
                     println!("OpenPortError: {}", s);
@@ -368,11 +375,13 @@ fn receive() -> glib::Continue {
                                                          gtk::DIALOG_DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
-                                                         "Error opening port");
+                                                         &s);
                     dialog.run();
                     dialog.destroy();
                     f_button.set_sensitive(false);
+                    signal_handler_block(o_button, ui.open_button_clicked_signal);
                     o_button.set_active(false);
+                    signal_handler_unblock(o_button, ui.open_button_clicked_signal);
                 }
                 Ok(SerialResponse::SendingFileComplete) |
                 Ok(SerialResponse::SendingFileCanceled) => {

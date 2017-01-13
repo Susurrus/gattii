@@ -68,13 +68,19 @@ impl SerialThread {
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
                         println!("Connecting to {} at {}", &name, baud);
-                        if let Ok(mut p) = open_port(name.clone(), baud) {
-                            // Set the timeout to 1ms to keep a tight event loop
-                            p.set_timeout(Duration::from_millis(1)).unwrap();
-                            port = Some(p);
-                            from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
-                        } else {
-                            from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
+                        match open_port(name.clone(), baud) {
+                            Ok(mut p) => {
+                                // Set the timeout to 1ms to keep a tight event loop
+                                p.set_timeout(Duration::from_millis(1)).unwrap();
+                                port = Some(p);
+                                from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
+                            },
+                            Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
+                                from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Port '{}' is already in use or doesn't exist", &name)))).unwrap();
+                            },
+                            Err(e) => {
+                                from_port_chan_tx.send(SerialResponse::OpenPortError(e.description)).unwrap();
+                            }
                         }
                         callback();
                     },
@@ -86,18 +92,29 @@ impl SerialThread {
                         }
                     },
                     Ok(SerialCommand::ChangePort(name)) => {
-                        println!("Changing port to {}", name);
-                        let baud_rate = match port {
-                            Some(p) => p.baud_rate(),
-                            None => None
-                        };
-                        let mut p = serialport::open(&name).unwrap();
-                        match baud_rate {
-                            Some(b) => p.set_baud_rate(b).unwrap(),
-                            None => ()
+                        // If there is an existing port, copy the settings from
+                        // the existing port to a new one.
+                        if port.is_some() {
+                            println!("Changing port to '{}'", &name);
+                            let settings = match port.as_ref() {
+                                Some(p) => Some(p.settings()),
+                                None => None
+                            };
+
+                            match serialport::open(&name) {
+                                Ok(mut p) => {
+                                    if let Some(s) = settings {
+                                        p.set_all(s).expect("Failed to apply all settings");
+                                    }
+                                    port = Some(p);
+                                },
+                                Err(e) => {
+                                    println!("{:?}", e);
+                                    from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap()
+                                }
+                            }
                         }
-                        port = Some(p);
-                    }
+                    },
                     Ok(SerialCommand::Disconnect) => {
                         println!("Disconnecting");
                         port = None;
