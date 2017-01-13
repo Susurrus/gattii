@@ -44,36 +44,36 @@ environment:
   # 1.13 64-bit GNU
     - channel: 1.13
       target: x86_64-pc-windows-gnu
-      ARCH: x86_64
+      BITS: 64
   # 1.13 32-bit GNU
     - channel: 1.13
       target: i686-pc-windows-gnu
-      ARCH: i686
+      BITS: 32
   # Stable 64-bit GNU
     - channel: stable
       target: x86_64-pc-windows-gnu
-      ARCH: x86_64
+      BITS: 64
   # Stable 32-bit GNU
     - channel: stable
       target: i686-pc-windows-gnu
-      ARCH: i686
+      BITS: 32
   # Beta 64-bit GNU
     - channel: beta
       target: x86_64-pc-windows-gnu
-      ARCH: x86_64
+      BITS: 64
   # Beta 32-bit GNU
     - channel: beta
       target: i686-pc-windows-gnu
-      ARCH: i686
+      BITS: 32
   # Nightly 64-bit GNU
     - channel: nightly
       target: x86_64-pc-windows-gnu
-      ARCH: x86_64
+      BITS: 64
       #cargoflags: --features "unstable"
   # Nightly 32-bit GNU
     - channel: nightly
       target: i686-pc-windows-gnu
-      ARCH: i686
+      BITS: 32
       #cargoflags: --features "unstable"
 
 ### Allowed failures ###
@@ -94,9 +94,11 @@ matrix:
 # For simple configurations, instead of using the build matrix, you can simply set the
 # default-toolchain and default-host manually here.
 install:
+  - IF "%BITS%" == "32" SET ARCH=i686
+  - IF "%BITS%" == "64" SET ARCH=x86_64
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - set PATH=C:\msys64\mingw%BITS%\bin;%PATH%;%USERPROFILE%\.cargo\bin
   - rustc -vV
   - cargo -vV
   - pacman --noconfirm -S mingw-w64-%ARCH%-gtk3
