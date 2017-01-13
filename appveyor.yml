@@ -42,11 +42,11 @@ environment:
 ### GNU Toolchains ###
 
   # 1.13 64-bit GNU
-    - channel: 1.13
+    - channel: 1.13.0
       target: x86_64-pc-windows-gnu
       BITS: 64
   # 1.13 32-bit GNU
-    - channel: 1.13
+    - channel: 1.13.0
       target: i686-pc-windows-gnu
       BITS: 32
   # Stable 64-bit GNU
