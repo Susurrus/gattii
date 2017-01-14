@@ -98,7 +98,7 @@ install:
   - IF "%BITS%" == "64" SET ARCH=x86_64
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain %channel% --default-host %target%
-  - set PATH=C:\msys64\mingw%BITS%\bin;%PATH%;%USERPROFILE%\.cargo\bin
+  - set PATH=C:\msys64\mingw%BITS%\bin;C:\msys64\usr\bin;%USERPROFILE%\.cargo\binl%;%PATH%
   - rustc -vV
   - cargo -vV
   - pacman --noconfirm -S mingw-w64-%ARCH%-gtk3
