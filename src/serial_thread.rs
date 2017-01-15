@@ -109,8 +109,9 @@ impl SerialThread {
                                     port = Some(p);
                                 },
                                 Err(e) => {
-                                    println!("{:?}", e);
-                                    from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap()
+                                    port = None;
+                                    from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
+                                    callback();
                                 }
                             }
                         }
