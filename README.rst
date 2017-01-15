@@ -33,7 +33,7 @@ Software Requirements
 
 This software is written in Rust, and as such requires the Rust toolchain to be installed to build it. Additionally there are library requirements for some of supporting libraries (gtk-rs).
 
-The only tier-1 platform for this is Linux x64, as that's what I develop and test on. I try to be diligent at testing all functionality on Windows, but as it's not my primary OS, some things may slip through the cracks.
+The only tier-1 platform for this is Linux x64, as that's what I develop and test on. I try to be diligent at testing all functionality on Windows, but as it's not my primary OS, some things may slip through the cracks. Windows has Tier 2 support in that compilation testing is done on it, but I don't actively test functionality. That being said, pretty much all functionality should be cross-platform as platform-specific features are under the serialport-rs library.
 
 Building
 ========
