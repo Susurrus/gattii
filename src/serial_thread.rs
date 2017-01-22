@@ -132,7 +132,7 @@ impl SerialThread {
                         }
                     },
                     Ok(SerialCommand::SendFile(f)) => {
-                        if let Some(_) = port {
+                        if port.is_some() {
                             println!("Sending file {:?}", f);
                             if let Ok(new_file) = File::open(f) {
                                 read_file = Some(Box::new(new_file));
@@ -196,7 +196,7 @@ impl SerialThread {
                     match read_len {
                         Some(x) => {
                             if x > 0 {
-                                if let Err(_) = p.write(&serial_buf_rx[..x]) {
+                                if p.write(&serial_buf_rx[..x]).is_err() {
                                     println!("Failed to send {} bytes", x);
                                     read_file = None;
                                 }
