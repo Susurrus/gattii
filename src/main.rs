@@ -99,12 +99,10 @@ fn main() {
     let mut ports_selector_map = HashMap::new();
     if let Ok(mut ports) = serial_thread::list_ports() {
         ports.sort();
-        if ports.len() > 0 {
-            let mut i: i32 = 0;
-            for p in ports {
+        if !ports.is_empty() {
+            for (i, p) in ports.into_iter().enumerate() {
                 ports_selector.append(None, &p);
                 ports_selector_map.insert(p, i);
-                i += 1;
             }
             ports_selector.set_active(0);
         } else {
@@ -299,7 +297,7 @@ fn main() {
     // Process any command line arguments that were passed
     if !serial_port_name.is_empty() && !serial_baud.is_empty() {
         if let Some(ports_selector_index) = ports_selector_map.get(&serial_port_name) {
-            ports_selector.set_active(*ports_selector_index);
+            ports_selector.set_active(*ports_selector_index as i32);
         } else {
             println!("ERROR: Invalid port name '{}' specified.", serial_port_name);
             process::exit(ExitCode::ArgumentError as i32);
