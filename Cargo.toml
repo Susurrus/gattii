@@ -10,6 +10,9 @@ description = "Cross platform GUI (GTK-based) serial terminal"
 
 [dependencies]
 argparse = "0.2"
-glib = "0.1"
-gtk = "0.1"
-serialport = "0.2"
+glib = { git = "https://github.com/gtk-rs/glib" }
+serialport = "0.3"
+
+[dependencies.gtk]
+git = "https://github.com/gtk-rs/gtk"
+features = ["v3_20"]

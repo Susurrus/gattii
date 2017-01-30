@@ -7,18 +7,23 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use self::serialport::prelude::*;
+pub use self::serialport::{BaudRate, DataBits, FlowControl, Parity, StopBits};
 
 pub enum SerialCommand {
-    ConnectToPort { name: String, baud: usize },
+    CancelSendFile,
     ChangeBaud(usize),
-    ChangePort(String),
+    ChangeDataBits(DataBits),
+    ChangeFlowControl(FlowControl),
+    ChangeStopBits(StopBits),
+    ChangeParity(Parity),
+    ChangePort(String), ///
+    ConnectToPort { name: String, baud: usize },
     Disconnect,
     SendData(Vec<u8>),
     SendFile(PathBuf),
-    CancelSendFile,
 }
 
 pub enum SerialResponse {
@@ -63,15 +68,15 @@ impl SerialThread {
             let mut serial_buf: Vec<u8> = vec![0; 1000];
             let mut serial_buf_rx = [0; 1000];
             let mut last_send_time = Instant::now();
+            let mut settings: SerialPortSettings = Default::default();
+
             loop {
                 // First check if we have any incoming commands
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                        println!("Connecting to {} at {}", &name, baud);
-                        match open_port(name.clone(), baud) {
-                            Ok(mut p) => {
-                                // Set the timeout to 1ms to keep a tight event loop
-                                p.set_timeout(Duration::from_millis(1)).unwrap();
+                        println!("Connecting to {} at {} with settings {:?}", &name, baud, &settings);
+                        match serialport::open_with_settings(&name, &settings) {
+                            Ok(p) => {
                                 port = Some(p);
                                 from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
                             },
@@ -85,28 +90,49 @@ impl SerialThread {
                         callback();
                     },
                     Ok(SerialCommand::ChangeBaud(baud)) => {
+                        println!("Changing baud to {}", baud);
+                        let baud_rate = BaudRate::from_speed(baud);
+                        settings.baud_rate = baud_rate;
                         if let Some(ref mut p) = port {
-                            println!("Changing baud to {}", baud);
-                            let baud_rate = BaudRate::from_speed(baud);
                             p.set_baud_rate(baud_rate).unwrap();
                         }
                     },
+                    Ok(SerialCommand::ChangeDataBits(data_bits)) => {
+                        println!("Changing data bits to {:?}", data_bits);
+                        settings.data_bits = data_bits;
+                        if let Some(ref mut p) = port {
+                            p.set_data_bits(data_bits).unwrap();
+                        }
+                    },
+                    Ok(SerialCommand::ChangeFlowControl(flow_control)) => {
+                        println!("Changing flow control to {:?}", flow_control);
+                        settings.flow_control = flow_control;
+                        if let Some(ref mut p) = port {
+                            p.set_flow_control(flow_control).unwrap();
+                        }
+                    },
+                    Ok(SerialCommand::ChangeStopBits(stop_bits)) => {
+                        println!("Changing stop bits to {:?}", stop_bits);
+                        settings.stop_bits = stop_bits;
+                        if let Some(ref mut p) = port {
+                            p.set_stop_bits(stop_bits).unwrap();
+                        }
+                    },
+                    Ok(SerialCommand::ChangeParity(parity)) => {
+                        println!("Changing parity to {:?}", parity);
+                        settings.parity = parity;
+                        if let Some(ref mut p) = port {
+                            p.set_parity(parity).unwrap();
+                        }
+                    },
                     Ok(SerialCommand::ChangePort(name)) => {
-                        // If there is an existing port, copy the settings from
-                        // the existing port to a new one.
                         if port.is_some() {
-                            println!("Changing port to '{}'", &name);
-                            let settings = match port.as_ref() {
-                                Some(p) => Some(p.settings()),
-                                None => None
-                            };
+                            println!("Changing port to '{}' using settings {:?}", &name, &settings);
 
-                            match serialport::open(&name) {
-                                Ok(mut p) => {
-                                    if let Some(s) = settings {
-                                        p.set_all(s).expect("Failed to apply all settings");
-                                    }
+                            match serialport::open_with_settings(&name, &settings) {
+                                Ok(p) => {
                                     port = Some(p);
+                                    from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
                                 },
                                 Err(_) => {
                                     port = None;
@@ -226,63 +252,74 @@ impl SerialThread {
                               port_name: String,
                               baud_rate: String)
                               -> Result<(), GeneralError> {
-        let baud_rate: usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
+        let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::ConnectToPort {
+        tx.send(SerialCommand::ConnectToPort {
                 name: port_name,
                 baud: baud_rate,
             })
-            .map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+            .map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_port_close_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_port_change_baud_cmd(&self, baud_rate: String) -> Result<(), GeneralError> {
-        let baud_rate: usize = try!(baud_rate.parse().map_err(GeneralError::Parse));
+        let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_port_change_data_bits_cmd(&self, data_bits: DataBits) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::ChangeDataBits(data_bits)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_port_change_flow_control_cmd(&self, flow_control: FlowControl) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::ChangeFlowControl(flow_control)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_port_change_stop_bits_cmd(&self, stop_bits: StopBits) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::ChangeStopBits(stop_bits)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_port_change_parity_cmd(&self, parity: Parity) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::ChangeParity(parity)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_port_change_port_cmd(&self, port_name: String) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_port_data_cmd(&self, data: Vec<u8>) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_port_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 
     pub fn send_cancel_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        try!(tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)); // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
-}
-
-fn open_port(port_name: String, baud_rate: usize) -> serialport::Result<Box<SerialPort>> {
-    // Open the specified serial port
-    let mut port = serialport::open(&port_name)?;
-
-    // Configure the port settings
-    port.set_baud_rate(BaudRate::from_speed(baud_rate))?;
-    port.set_data_bits(DataBits::Eight)?;
-    port.set_stop_bits(StopBits::One)?;
-    port.set_flow_control(FlowControl::None)?;
-
-    Ok(port)
 }

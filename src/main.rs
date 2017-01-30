@@ -53,6 +53,10 @@ struct Ui {
     text_buffer: gtk::TextBuffer,
     file_button: gtk::ToggleToolButton,
     open_button: gtk::ToggleToolButton,
+    data_bits_scale: gtk::Scale,
+    stop_bits_scale: gtk::Scale,
+    parity_dropdown: gtk::ComboBoxText,
+    flow_control_dropdown: gtk::ComboBoxText,
     text_view_insert_signal: u64,
     open_button_clicked_signal: u64
 }
@@ -93,8 +97,10 @@ fn main() {
     window.set_position(gtk::WindowPosition::Center);
     window.set_default_size(400, 300);
 
-    // Create a toolbar with the basic options in it
+    // Create the top toolbar
     let toolbar = gtk::Toolbar::new();
+
+    // Add a port selector
     let ports_selector = gtk::ComboBoxText::new();
     let mut ports_selector_map = HashMap::new();
     if let Ok(mut ports) = serial_thread::list_ports() {
@@ -118,6 +124,7 @@ fn main() {
     let ports_selector_container = gtk::ToolItem::new();
     ports_selector_container.add(&ports_selector);
 
+    // Add a baud rate selector
     let mut baud_selector_map = HashMap::new();
     baud_selector_map.insert("921600".to_string(), 0i32);
     baud_selector_map.insert("115200".to_string(), 1i32);
@@ -133,11 +140,71 @@ fn main() {
     baud_selector.append(None, "38400");
     baud_selector.append(None, "19200");
     baud_selector.append(None, "9600");
-    baud_selector.set_active(1);
+    baud_selector.set_active(5);
     let baud_selector_container = gtk::ToolItem::new();
     baud_selector_container.add(&baud_selector);
     toolbar.add(&baud_selector_container);
 
+    // Add the port settings button
+    let port_settings_button = gtk::MenuButton::new();
+    port_settings_button.set_direction(gtk::ArrowType::None);
+    let port_settings_popover = gtk::Popover::new(Some(&port_settings_button));
+    port_settings_popover.set_position(gtk::PositionType::Bottom);
+    port_settings_popover.set_constrain_to(gtk::PopoverConstraint::None);
+    port_settings_button.set_popover(Some(&port_settings_popover));
+    let popover_container = gtk::Grid::new();
+    popover_container.set_margin_top(10);
+    popover_container.set_margin_right(10);
+    popover_container.set_margin_bottom(10);
+    popover_container.set_margin_left(10);
+    popover_container.set_row_spacing(10);
+    popover_container.set_column_spacing(10);
+    let data_bits_label = gtk::Label::new(Some("Data bits:"));
+    data_bits_label.set_halign(gtk::Align::End);
+    popover_container.attach(&data_bits_label, 0, 0, 1, 1);
+    let data_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 5.0, 8.0, 1.0);
+    // TODO: Waiting on a new GTK point release to fix set_draw_value(false) working
+    //data_bits_scale.set_draw_value(false);
+    data_bits_scale.set_value(8.0);
+    data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, Some("5"));
+    data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, Some("6"));
+    data_bits_scale.add_mark(7.0, gtk::PositionType::Bottom, Some("7"));
+    data_bits_scale.add_mark(8.0, gtk::PositionType::Bottom, Some("8"));
+    popover_container.attach(&data_bits_scale, 1, 0, 1, 1);
+    let stop_bits_label = gtk::Label::new(Some("Stop bits:"));
+    stop_bits_label.set_halign(gtk::Align::End);
+    popover_container.attach(&stop_bits_label, 0, 1, 1, 1);
+    let stop_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
+    // TODO: Waiting on a new GTK point release to fix set_draw_value(false) working
+    //stop_bits_scale.set_draw_value(false);
+    stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, Some("1"));
+    stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, Some("2"));
+    popover_container.attach(&stop_bits_scale, 1, 1, 1, 1);
+    let parity_label = gtk::Label::new(Some("Parity:"));
+    parity_label.set_halign(gtk::Align::End);
+    popover_container.attach(&parity_label, 0, 2, 1, 1);
+    let parity_dropdown = gtk::ComboBoxText::new();
+    parity_dropdown.append(None, "None");
+    parity_dropdown.append(None, "Odd");
+    parity_dropdown.append(None, "Even");
+    parity_dropdown.set_active(0);
+    popover_container.attach(&parity_dropdown, 1, 2, 1, 1);
+    let flow_control_label = gtk::Label::new(Some("Flow control:"));
+    flow_control_label.set_halign(gtk::Align::End);
+    popover_container.attach(&flow_control_label, 0, 3, 1, 1);
+    let flow_control_dropdown = gtk::ComboBoxText::new();
+    flow_control_dropdown.append(None, "None");
+    flow_control_dropdown.append(None, "Hardware");
+    flow_control_dropdown.append(None, "Software");
+    flow_control_dropdown.set_active(0);
+    popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
+    popover_container.show_all();
+    port_settings_popover.add(&popover_container);
+    let port_settings_button_container = gtk::ToolItem::new();
+    port_settings_button_container.add(&port_settings_button);
+    toolbar.add(&port_settings_button_container);
+
+    // Add the open button
     let open_button = gtk::ToggleToolButton::new();
     open_button.set_icon_name(Some("media-playback-start"));
     open_button.set_is_important(true);
@@ -180,8 +247,12 @@ fn main() {
         window: window.clone(),
         text_view: text_view.clone(),
         text_buffer: buffer.clone(),
-        open_button: open_button.clone(),
         file_button: send_file_button.clone(),
+        open_button: open_button.clone(),
+        data_bits_scale: data_bits_scale.clone(),
+        stop_bits_scale: stop_bits_scale.clone(),
+        parity_dropdown: parity_dropdown.clone(),
+        flow_control_dropdown: flow_control_dropdown.clone(),
         text_view_insert_signal: 0,
         open_button_clicked_signal: 0
     };
@@ -259,7 +330,105 @@ fn main() {
 
     GLOBAL.with(|global| {
         if let Some((ref ui, _)) = *global.borrow() {
+            // Connect file selector button to callback. This is left as a
+            // separate function to reduce rightward drift.
             ui.file_button.connect_toggled(file_button_connect_toggled);
+
+            // Configure the data bits callback
+            ui.data_bits_scale.connect_value_changed(|s| {
+                let data_bits = match s.get_value() {
+                    5.0 => DataBits::Five,
+                    6.0 => DataBits::Six,
+                    7.0 => DataBits::Seven,
+                    8.0 => DataBits::Eight,
+                    _ => unreachable!(),
+                };
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                        match serial_thread.send_port_change_data_bits_cmd(data_bits) {
+                            Err(GeneralError::Parse(_)) => {
+                                unreachable!();
+                            }
+                            Err(GeneralError::Send(_)) => {
+                                println!("Error sending data bits change command to child thread. Aborting.")
+                            }
+                            Ok(_) => (),
+                        }
+                    }
+                });
+            });
+
+            // Configure the data bits callback
+            ui.stop_bits_scale.connect_value_changed(|s| {
+                let stop_bits = match s.get_value() {
+                    1.0 => StopBits::One,
+                    2.0 => StopBits::Two,
+                    _ => unreachable!(),
+                };
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                        match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
+                            Err(GeneralError::Parse(_)) => {
+                                unreachable!();
+                            }
+                            Err(GeneralError::Send(_)) => {
+                                println!("Error sending stop bits change command to child thread. Aborting.")
+                            }
+                            Ok(_) => (),
+                        }
+                    }
+                });
+            });
+
+            // Configure the parity dropdown callback
+            ui.parity_dropdown.connect_changed(|s| {
+                let parity = match s.get_active_text() {
+                    Some(ref x) if x == "None" => Some(Parity::None),
+                    Some(ref x) if x == "Odd" => Some(Parity::Odd),
+                    Some(ref x) if x == "Even" => Some(Parity::Even),
+                    Some(_) | None => unreachable!(),
+                };
+                if let Some(parity) = parity {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                            match serial_thread.send_port_change_parity_cmd(parity) {
+                                Err(GeneralError::Parse(_)) => {
+                                    unreachable!();
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    println!("Error sending parity change command to child thread. Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Configure the data bits callback
+            ui.flow_control_dropdown.connect_changed(|s| {
+                let flow_control = match s.get_active_text() {
+                    Some(ref x) if x == "None" => Some(FlowControl::None),
+                    Some(ref x) if x == "Software" => Some(FlowControl::Software),
+                    Some(ref x) if x == "Hardware" => Some(FlowControl::Hardware),
+                    Some(_) | None => unreachable!(),
+                };
+                if let Some(flow_control) = flow_control {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                            match serial_thread.send_port_change_flow_control_cmd(flow_control) {
+                                Err(GeneralError::Parse(_)) => {
+                                    unreachable!();
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    println!("Error sending flow control change command to child thread. Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
         }
     });
 
