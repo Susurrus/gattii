@@ -274,7 +274,8 @@ fn main() {
                             println!("Invalid baud rate '{}' specified.", &baud_rate)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending port_open command to child thread. Aborting.")
+                            println!("Error sending port_open command to child \
+                                      thread. Aborting.")
                         }
                         Ok(_) => (),
                     }
@@ -292,7 +293,8 @@ fn main() {
                             println!("Invalid port name '{}' specified.", &port_name)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending change_port command to child thread. Aborting.")
+                            println!("Error sending change_port command to child \
+                                      thread. Aborting.")
                         }
                         Ok(_) => (),
                     }
@@ -311,7 +313,8 @@ fn main() {
                                 Err(GeneralError::Parse(_)) =>
                                     println!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) =>
-                                    println!("Error sending port_open command to child thread. Aborting."),
+                                    println!("Error sending port_open command to \
+                                              child thread. Aborting."),
                                 Ok(_) => ()
                             }
                         }
@@ -352,7 +355,8 @@ fn main() {
                                 unreachable!();
                             }
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending data bits change command to child thread. Aborting.")
+                                println!("Error sending data bits change command \
+                                          to child thread. Aborting.")
                             }
                             Ok(_) => (),
                         }
@@ -374,7 +378,8 @@ fn main() {
                                 unreachable!();
                             }
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending stop bits change command to child thread. Aborting.")
+                                println!("Error sending stop bits change command \
+                                          to child thread. Aborting.")
                             }
                             Ok(_) => (),
                         }
@@ -398,7 +403,8 @@ fn main() {
                                     unreachable!();
                                 }
                                 Err(GeneralError::Send(_)) => {
-                                    println!("Error sending parity change command to child thread. Aborting.")
+                                    println!("Error sending parity change command \
+                                              to child thread. Aborting.")
                                 }
                                 Ok(_) => (),
                             }
@@ -423,7 +429,8 @@ fn main() {
                                     unreachable!();
                                 }
                                 Err(GeneralError::Send(_)) => {
-                                    println!("Error sending flow control change command to child thread. Aborting.")
+                                    println!("Error sending flow control change \
+                                              command to child thread. Aborting.")
                                 }
                                 Ok(_) => (),
                             }
@@ -471,7 +478,8 @@ fn main() {
                         let v = Vec::from(text);
                         match serial_thread.send_port_data_cmd(v) {
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending data command to child thread. Aborting.")
+                                println!("Error sending data command to child \
+                                          thread. Aborting.")
                             }
                             Err(_) | Ok(_) => (),
                         }
@@ -622,7 +630,8 @@ fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
 		            if let Some((_, ref serial_thread)) = *global.borrow() {
 		                match serial_thread.send_port_file_cmd(filename) {
 		                    Err(_) => {
-		                        println!("Error sending port_file command to child thread. Aborting.");
+		                        println!("Error sending port_file command to \
+		                                  child thread. Aborting.");
 		                        b.set_sensitive(true);
 		                        b.set_active(false);
 		                    },
