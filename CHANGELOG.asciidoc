@@ -8,6 +8,8 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 === Unreleased
 ==== Added
 * Non-baud port settings are now configurable
+* The text view can be cleared through the 'Clear All' option in the right-click
+  menu
 
 ==== Changed
 * Updated the README
