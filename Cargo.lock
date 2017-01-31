@@ -1,6 +1,6 @@
 [root]
 name = "gattii"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",

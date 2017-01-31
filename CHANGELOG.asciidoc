@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on http://keepachangelog.com/[Keep a Changelog]
 and this project adheres to http://semver.org/[Semantic Versioning].
 
-=== Unreleased
+=== [0.2.0] - 2017-01-31
 ==== Added
 * Non-baud port settings are now configurable
 * The text view can be cleared through the 'Clear All' option in the right-click
