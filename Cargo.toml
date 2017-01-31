@@ -9,13 +9,13 @@ readme = "README.rst"
 repository = "https://gitlab.com/susurrus/gattii"
 description = "Cross platform GUI (GTK-based) serial terminal"
 
+[badges]
+appveyor = { repository = "Susurrus/gattii", service = "gitlab" }
+
 [dependencies]
 argparse = "0.2"
 glib = "0.1"
 serialport = "0.3"
-
-[badges]
-appveyor = { repository = "Susurrus/gattii", service = "gitlab" }
 
 [dependencies.gtk]
 version = "0.1"
