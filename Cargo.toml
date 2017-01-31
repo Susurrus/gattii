@@ -2,6 +2,7 @@
 name = "gattii"
 version = "0.1.1"
 authors = ["Bryant Mairs <bryant@mai.rs>"]
+categories = ["gui", "hardware-support"]
 keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 license = "GPL-3.0"
 readme = "README.rst"
