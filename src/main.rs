@@ -58,6 +58,7 @@ struct Ui {
     parity_dropdown: gtk::ComboBoxText,
     flow_control_dropdown: gtk::ComboBoxText,
     text_view_insert_signal: u64,
+    text_buffer_delete_signal: u64,
     open_button_clicked_signal: u64
 }
 
@@ -254,6 +255,7 @@ fn main() {
         parity_dropdown: parity_dropdown.clone(),
         flow_control_dropdown: flow_control_dropdown.clone(),
         text_view_insert_signal: 0,
+        text_buffer_delete_signal: 0,
         open_button_clicked_signal: 0
     };
     GLOBAL.with(move |global| {
@@ -429,6 +431,34 @@ fn main() {
                     });
                 }
             });
+
+            // Configure the right-click menu for the text view widget
+            ui.text_view.connect_populate_popup( |_, p| {
+                if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
+                    println!("Menu!");
+                    let clear_all = gtk::MenuItem::new_with_label("Clear All");
+                    clear_all.connect_activate(|_| {
+                        GLOBAL.with(|global| {
+                            if let Some((ref ui, _)) = *global.borrow() {
+                                // In order to clear the buffer we need to
+                                // disable the insert-text and delete-range
+                                // signal handlers.
+                                signal_handler_block(&ui.text_buffer,
+                                                     ui.text_view_insert_signal);
+                                signal_handler_block(&ui.text_buffer,
+                                                     ui.text_buffer_delete_signal);
+                                ui.text_buffer.set_text("");
+                                signal_handler_unblock(&ui.text_buffer,
+                                                       ui.text_buffer_delete_signal);
+                                signal_handler_unblock(&ui.text_buffer,
+                                                       ui.text_view_insert_signal);
+                            }
+                        });
+                    });
+                    popup.append(&clear_all);
+                    popup.show_all();
+                }
+            });
         }
     });
 
@@ -455,9 +485,9 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((ref ui, _)) = *global.borrow() {
+        if let Some((ref mut ui, _)) = *global.borrow_mut() {
             let b = &ui.text_buffer;
-            b.connect_delete_range(move |b, _, _| {
+            ui.text_buffer_delete_signal = b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
         }
