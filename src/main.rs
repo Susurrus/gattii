@@ -645,7 +645,8 @@ fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
             } else {
                 match serial_thread.send_cancel_file_cmd() {
                     Err(GeneralError::Send(_)) => {
-                        println!("Error sending cancel_file command to child thread. Aborting.");
+                        println!("Error sending cancel_file command to child \
+                                  thread. Aborting.");
                     }
                     Err(_) | Ok(_) => (),
                 }
