@@ -9,8 +9,7 @@ use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
 use std::time::Instant;
 
-use self::serialport::prelude::*;
-pub use self::serialport::{BaudRate, DataBits, FlowControl, Parity, StopBits};
+pub use self::serialport::prelude::*;
 
 pub enum SerialCommand {
     CancelSendFile,
