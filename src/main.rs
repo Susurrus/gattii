@@ -100,6 +100,7 @@ fn main() {
 
     // Create the top toolbar
     let toolbar = gtk::Toolbar::new();
+    toolbar.set_show_arrow(false);
 
     // Add a port selector
     let ports_selector = gtk::ComboBoxText::new();
