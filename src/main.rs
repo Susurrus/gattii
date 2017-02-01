@@ -51,8 +51,8 @@ struct Ui {
     window: gtk::Window,
     text_view: gtk::TextView,
     text_buffer: gtk::TextBuffer,
-    file_button: gtk::ToggleToolButton,
-    open_button: gtk::ToggleToolButton,
+    file_button: gtk::ToggleButton,
+    open_button: gtk::ToggleButton,
     data_bits_scale: gtk::Scale,
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
@@ -208,10 +208,10 @@ fn main() {
     toolbar.add(&port_settings_button_container);
 
     // Add the open button
-    let open_button = gtk::ToggleToolButton::new();
-    open_button.set_icon_name(Some("media-playback-start"));
-    open_button.set_is_important(true);
-    toolbar.add(&open_button);
+    let open_button_container = gtk::ToolItem::new();
+    let open_button = gtk::ToggleButton::new_with_label("Open");
+    open_button_container.add(&open_button);
+    toolbar.add(&open_button_container);
 
     // Set up an auto-scrolling text view
     let text_view = gtk::TextView::new();
@@ -233,10 +233,15 @@ fn main() {
     separator.set_draw(false);
     separator.set_expand(true);
     toolbar.add(&separator);
-    let send_file_button = gtk::ToggleToolButton::new();
-    send_file_button.set_icon_name(Some("folder"));
+    let send_file_button = gtk::ToggleButton::new();
+    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
+    // is resolved
+    let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    send_file_button.set_image(&send_file_image);
     send_file_button.set_sensitive(false);
-    toolbar.add(&send_file_button);
+    let send_file_button_container = gtk::ToolItem::new();
+    send_file_button_container.add(&send_file_button);
+    toolbar.add(&send_file_button_container);
 
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -614,7 +619,7 @@ fn receive() -> glib::Continue {
     glib::Continue(false)
 }
 
-fn file_button_connect_toggled(b: &gtk::ToggleToolButton) {
+fn file_button_connect_toggled(b: &gtk::ToggleButton) {
     GLOBAL.with(|global| {
         if let Some((ref ui, ref serial_thread)) = *global.borrow() {
             let window = &ui.window;
