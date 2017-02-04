@@ -455,7 +455,7 @@ fn main() {
             });
 
             // Configure the right-click menu for the text view widget
-            ui.text_view.connect_populate_popup(|_, p| {
+            ui.text_view.connect_populate_popup(|t, p| {
                 if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
 
                     // Remove the "delete" menu option as it doesn't even work
@@ -498,25 +498,33 @@ fn main() {
                         }
                     });
 
+                    // Add a "Clear All" button that's only active if there's
+                    // data in the buffer.
                     let clear_all = gtk::MenuItem::new_with_label("Clear All");
-                    clear_all.connect_activate(|_| {
-                        GLOBAL.with(|global| {
-                            if let Some((ref ui, _, _)) = *global.borrow() {
-                                // In order to clear the buffer we need to
-                                // disable the insert-text and delete-range
-                                // signal handlers.
-                                signal_handler_block(&ui.text_buffer,
-                                                     ui.text_view_insert_signal);
-                                signal_handler_block(&ui.text_buffer,
-                                                     ui.text_buffer_delete_signal);
-                                ui.text_buffer.set_text("");
-                                signal_handler_unblock(&ui.text_buffer,
-                                                       ui.text_buffer_delete_signal);
-                                signal_handler_unblock(&ui.text_buffer,
-                                                       ui.text_view_insert_signal);
-                            }
-                        });
-                    });
+                    if let Some(b) = t.get_buffer() {
+                        if b.get_char_count() == 0 {
+                            clear_all.set_sensitive(false);
+                        } else {
+                            clear_all.connect_activate(|_| {
+                                GLOBAL.with(|global| {
+                                    if let Some((ref ui, _, _)) = *global.borrow() {
+                                        // In order to clear the buffer we need to
+                                        // disable the insert-text and delete-range
+                                        // signal handlers.
+                                        signal_handler_block(&ui.text_buffer,
+                                                             ui.text_view_insert_signal);
+                                        signal_handler_block(&ui.text_buffer,
+                                                             ui.text_buffer_delete_signal);
+                                        ui.text_buffer.set_text("");
+                                        signal_handler_unblock(&ui.text_buffer,
+                                                               ui.text_buffer_delete_signal);
+                                        signal_handler_unblock(&ui.text_buffer,
+                                                               ui.text_view_insert_signal);
+                                    }
+                                });
+                            });
+                        }
+                    }
                     popup.append(&clear_all);
                     popup.show_all();
                 }
