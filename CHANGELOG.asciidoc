@@ -6,9 +6,16 @@ The format is based on http://keepachangelog.com/[Keep a Changelog]
 and this project adheres to http://semver.org/[Semantic Versioning].
 
 === Unreleased
+==== Added
+* "Clear All" option in the right-click menu (only active when text in the buffer)
+
 ==== Fixed
 * Toolbar buttons now have consistent styling
 * The toolbar can no longer be shrunk in width to an unusable size
+* "Delete" on the right-click menu has been removed as it didn't work
+
+==== Changed
+* "Paste" option in the right-click menu only active if a port is open
 
 === [0.2.0] - 2017-01-31
 ==== Added
