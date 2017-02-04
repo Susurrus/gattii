@@ -457,7 +457,6 @@ fn main() {
             // Configure the right-click menu for the text view widget
             ui.text_view.connect_populate_popup(|_, p| {
                 if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
-                    println!("Menu!");
 
                     // Remove the "delete" menu option as it doesn't even work
                     // because the "delete-range" signal is disabled.
