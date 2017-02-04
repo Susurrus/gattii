@@ -459,6 +459,23 @@ fn main() {
                 if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
                     println!("Menu!");
 
+                    // Remove the "delete" menu option as it doesn't even work
+                    // because the "delete-range" signal is disabled.
+                    for c in popup.get_children() {
+                        // Workaround for Bug 778162:
+                        // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+                        if c.is::<gtk::SeparatorMenuItem>() {
+                            continue;
+                        }
+                        if let Ok(child) = c.clone().downcast::<gtk::MenuItem>() {
+                            if let Some(l) = child.get_label() {
+                                if l == "_Delete" {
+                                    popup.remove(&c);
+                                }
+                            }
+                        }
+                    }
+
                     // Only enable the Paste option if a port is open
                     GLOBAL.with(|global| {
                         if let Some((_, _, ref state)) = *global.borrow() {
