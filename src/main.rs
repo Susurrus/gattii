@@ -59,12 +59,16 @@ struct Ui {
     flow_control_dropdown: gtk::ComboBoxText,
     text_view_insert_signal: u64,
     text_buffer_delete_signal: u64,
-    open_button_clicked_signal: u64
+    open_button_clicked_signal: u64,
+}
+
+struct State {
+    connected: bool,
 }
 
 // declare a new thread local storage key
 thread_local!(
-    static GLOBAL: RefCell<Option<(Ui, SerialThread)>> = RefCell::new(None)
+    static GLOBAL: RefCell<Option<(Ui, SerialThread, State)>> = RefCell::new(None)
 );
 
 fn main() {
@@ -265,17 +269,21 @@ fn main() {
         text_buffer_delete_signal: 0,
         open_button_clicked_signal: 0
     };
+    let state = State {
+        connected: false
+    };
     GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((ui,
                                      SerialThread::new(|| {
                                          glib::idle_add(receive);
-                                     })))
+                                     }),
+                                     state));
     });
 
     baud_selector.connect_changed(move |s| {
         if let Some(baud_rate) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread)) = *global.borrow() {
+                if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => {
                             println!("Invalid baud rate '{}' specified.", &baud_rate)
@@ -294,7 +302,7 @@ fn main() {
     ports_selector.connect_changed(move |s| {
         if let Some(port_name) = s.get_active_text() {
             GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread)) = *global.borrow() {
+                if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_change_port_cmd(port_name.clone()) {
                         Err(GeneralError::Parse(_)) => {
                             println!("Invalid port name '{}' specified.", &port_name)
@@ -315,7 +323,7 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) =>
                                     println!("Invalid baud rate '{}' specified.", &baud_rate),
@@ -330,7 +338,7 @@ fn main() {
             }
         } else {
             GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread)) = *global.borrow() {
+                if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_close_cmd() {
                         Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
@@ -341,7 +349,7 @@ fn main() {
     }));
 
     GLOBAL.with(|global| {
-        if let Some((ref ui, _)) = *global.borrow() {
+        if let Some((ref ui, _, _)) = *global.borrow() {
             // Connect file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
             ui.file_button.connect_toggled(file_button_connect_toggled);
@@ -356,7 +364,7 @@ fn main() {
                     _ => unreachable!(),
                 };
                 GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
                         match serial_thread.send_port_change_data_bits_cmd(data_bits) {
                             Err(GeneralError::Parse(_)) => {
                                 unreachable!();
@@ -379,7 +387,7 @@ fn main() {
                     _ => unreachable!(),
                 };
                 GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
                         match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
                             Err(GeneralError::Parse(_)) => {
                                 unreachable!();
@@ -404,7 +412,7 @@ fn main() {
                 };
                 if let Some(parity) = parity {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                        if let Some((_, ref serial_thread,  _)) = *global.borrow() {
                             match serial_thread.send_port_change_parity_cmd(parity) {
                                 Err(GeneralError::Parse(_)) => {
                                     unreachable!();
@@ -430,7 +438,7 @@ fn main() {
                 };
                 if let Some(flow_control) = flow_control {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread)) = *global.borrow() {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_flow_control_cmd(flow_control) {
                                 Err(GeneralError::Parse(_)) => {
                                     unreachable!();
@@ -447,13 +455,37 @@ fn main() {
             });
 
             // Configure the right-click menu for the text view widget
-            ui.text_view.connect_populate_popup( |_, p| {
+            ui.text_view.connect_populate_popup(|_, p| {
                 if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
                     println!("Menu!");
+
+                    // Only enable the Paste option if a port is open
+                    GLOBAL.with(|global| {
+                        if let Some((_, _, ref state)) = *global.borrow() {
+                            if !state.connected {
+                                for c in popup.get_children() {
+                                    // Workaround for Bug 778162:
+                                    // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+                                    if c.is::<gtk::SeparatorMenuItem>() {
+                                        continue;
+                                    }
+                                    if let Ok(child) = c.downcast::<gtk::MenuItem>() {
+                                        if let Some(l) = child.get_label() {
+                                            if l == "_Paste" {
+                                                child.set_sensitive(false);
+                                            }
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+                    });
+
                     let clear_all = gtk::MenuItem::new_with_label("Clear All");
                     clear_all.connect_activate(|_| {
                         GLOBAL.with(|global| {
-                            if let Some((ref ui, _)) = *global.borrow() {
+                            if let Some((ref ui, _, _)) = *global.borrow() {
                                 // In order to clear the buffer we need to
                                 // disable the insert-text and delete-range
                                 // signal handlers.
@@ -477,11 +509,11 @@ fn main() {
     });
 
     GLOBAL.with(|global| {
-        if let Some((ref mut ui, _)) = *global.borrow_mut() {
+        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
             let b = &ui.text_buffer;
             ui.text_view_insert_signal = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread)) = *global.borrow() {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
                         let v = Vec::from(text);
                         match serial_thread.send_port_data_cmd(v) {
                             Err(GeneralError::Send(_)) => {
@@ -500,7 +532,7 @@ fn main() {
 
     // Disable deletion of characters within the textview
     GLOBAL.with(|global| {
-        if let Some((ref mut ui, _)) = *global.borrow_mut() {
+        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
             let b = &ui.text_buffer;
             ui.text_buffer_delete_signal = b.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
@@ -532,7 +564,7 @@ fn main() {
     }
 
     GLOBAL.with(|global| {
-        if let Some((ref ui, _)) = *global.borrow() {
+        if let Some((ref ui, _, _)) = *global.borrow() {
             let window = &ui.window;
             window.connect_delete_event(|_, _| {
                 gtk::main_quit();
@@ -548,7 +580,7 @@ fn main() {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref ui, ref serial_thread)) = *global.borrow() {
+        if let Some((ref ui, ref serial_thread, ref mut state)) = *global.borrow_mut() {
             let window = &ui.window;
             let view = &ui.text_view;
             let buf = &ui.text_buffer;
@@ -576,10 +608,12 @@ fn receive() -> glib::Continue {
                 Ok(SerialResponse::DisconnectSuccess) => {
                     f_button.set_sensitive(false);
                     f_button.set_active(false);
+                    state.connected = false;
                 }
                 Ok(SerialResponse::OpenPortSuccess) => {
                     f_button.set_sensitive(true);
                     o_button.set_active(true);
+                    state.connected = true;
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
                     println!("OpenPortError: {}", s);
@@ -594,6 +628,7 @@ fn receive() -> glib::Continue {
                     signal_handler_block(o_button, ui.open_button_clicked_signal);
                     o_button.set_active(false);
                     signal_handler_unblock(o_button, ui.open_button_clicked_signal);
+                    state.connected = false;
                 }
                 Ok(SerialResponse::SendingFileComplete) |
                 Ok(SerialResponse::SendingFileCanceled) => {
@@ -621,7 +656,7 @@ fn receive() -> glib::Continue {
 
 fn file_button_connect_toggled(b: &gtk::ToggleButton) {
     GLOBAL.with(|global| {
-        if let Some((ref ui, ref serial_thread)) = *global.borrow() {
+        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
             let window = &ui.window;
             let view = &ui.text_view;
             if b.get_active() {
@@ -634,7 +669,7 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
                     GLOBAL.with(|global| {
-		            if let Some((_, ref serial_thread)) = *global.borrow() {
+		            if let Some((_, ref serial_thread, _)) = *global.borrow() {
 		                match serial_thread.send_port_file_cmd(filename) {
 		                    Err(_) => {
 		                        println!("Error sending port_file command to \
