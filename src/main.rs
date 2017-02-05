@@ -170,8 +170,9 @@ fn main() {
     data_bits_label.set_halign(gtk::Align::End);
     popover_container.attach(&data_bits_label, 0, 0, 1, 1);
     let data_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 5.0, 8.0, 1.0);
-    // TODO: Waiting on a new GTK point release to fix set_draw_value(false) working
-    //data_bits_scale.set_draw_value(false);
+    data_bits_scale.set_draw_value(false);
+    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
+    data_bits_scale.set_round_digits(0);
     data_bits_scale.set_value(8.0);
     data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, Some("5"));
     data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, Some("6"));
@@ -182,8 +183,9 @@ fn main() {
     stop_bits_label.set_halign(gtk::Align::End);
     popover_container.attach(&stop_bits_label, 0, 1, 1, 1);
     let stop_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
-    // TODO: Waiting on a new GTK point release to fix set_draw_value(false) working
-    //stop_bits_scale.set_draw_value(false);
+    stop_bits_scale.set_draw_value(false);
+    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
+    stop_bits_scale.set_round_digits(0);
     stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, Some("1"));
     stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, Some("2"));
     popover_container.attach(&stop_bits_scale, 1, 1, 1, 1);
