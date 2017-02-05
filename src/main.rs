@@ -2,6 +2,8 @@
 
 extern crate argparse;
 extern crate core;
+extern crate env_logger;
+#[macro_use] extern crate log;
 extern crate gtk;
 extern crate glib;
 
@@ -72,6 +74,9 @@ thread_local!(
 );
 
 fn main() {
+    // Initialize logging
+    env_logger::init().expect("Failed to initialize logging");
+
     // Store command-line arguments
     let mut serial_port_name = "".to_string();
     let mut serial_baud = "".to_string();
@@ -92,7 +97,7 @@ fn main() {
     }
 
     if gtk::init().is_err() {
-        println!("Failed to initialize GTK.");
+        error!("Failed to initialize GTK.");
         return;
     }
 
@@ -288,10 +293,10 @@ fn main() {
                 if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
                         Err(GeneralError::Parse(_)) => {
-                            println!("Invalid baud rate '{}' specified.", &baud_rate)
+                            error!("Invalid baud rate '{}' specified.", &baud_rate)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending port_open command to child \
+                            error!("Error sending port_open command to child \
                                       thread. Aborting.")
                         }
                         Ok(_) => (),
@@ -307,10 +312,10 @@ fn main() {
                 if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_change_port_cmd(port_name.clone()) {
                         Err(GeneralError::Parse(_)) => {
-                            println!("Invalid port name '{}' specified.", &port_name)
+                            error!("Invalid port name '{}' specified.", &port_name)
                         }
                         Err(GeneralError::Send(_)) => {
-                            println!("Error sending change_port command to child \
+                            error!("Error sending change_port command to child \
                                       thread. Aborting.")
                         }
                         Ok(_) => (),
@@ -328,9 +333,9 @@ fn main() {
                         if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) =>
-                                    println!("Invalid baud rate '{}' specified.", &baud_rate),
+                                    error!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) =>
-                                    println!("Error sending port_open command to \
+                                    error!("Error sending port_open command to \
                                               child thread. Aborting."),
                                 Ok(_) => ()
                             }
@@ -342,7 +347,7 @@ fn main() {
             GLOBAL.with(|global| {
                 if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_close_cmd() {
-                        Err(GeneralError::Send(_)) => println!("Error sending port_close command to child thread. Aborting."),
+                        Err(GeneralError::Send(_)) => error!("Error sending port_close command to child thread. Aborting."),
                         Err(_) | Ok(_) => ()
                     }
                 }
@@ -372,7 +377,7 @@ fn main() {
                                 unreachable!();
                             }
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending data bits change command \
+                                error!("Error sending data bits change command \
                                           to child thread. Aborting.")
                             }
                             Ok(_) => (),
@@ -395,7 +400,7 @@ fn main() {
                                 unreachable!();
                             }
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending stop bits change command \
+                                error!("Error sending stop bits change command \
                                           to child thread. Aborting.")
                             }
                             Ok(_) => (),
@@ -420,7 +425,7 @@ fn main() {
                                     unreachable!();
                                 }
                                 Err(GeneralError::Send(_)) => {
-                                    println!("Error sending parity change command \
+                                    error!("Error sending parity change command \
                                               to child thread. Aborting.")
                                 }
                                 Ok(_) => (),
@@ -446,7 +451,7 @@ fn main() {
                                     unreachable!();
                                 }
                                 Err(GeneralError::Send(_)) => {
-                                    println!("Error sending flow control change \
+                                    error!("Error sending flow control change \
                                               command to child thread. Aborting.")
                                 }
                                 Ok(_) => (),
@@ -543,7 +548,7 @@ fn main() {
                         let v = Vec::from(text);
                         match serial_thread.send_port_data_cmd(v) {
                             Err(GeneralError::Send(_)) => {
-                                println!("Error sending data command to child \
+                                error!("Error sending data command to child \
                                           thread. Aborting.")
                             }
                             Err(_) | Ok(_) => (),
@@ -571,21 +576,21 @@ fn main() {
         if let Some(ports_selector_index) = ports_selector_map.get(&serial_port_name) {
             ports_selector.set_active(*ports_selector_index as i32);
         } else {
-            println!("ERROR: Invalid port name '{}' specified.", serial_port_name);
+            error!("Invalid port name '{}' specified.", serial_port_name);
             process::exit(ExitCode::ArgumentError as i32);
         }
         if let Some(baud_selector_index) = baud_selector_map.get(&serial_baud) {
             baud_selector.set_active(*baud_selector_index);
         } else {
-            println!("ERROR: Invalid baud rate '{}' specified.", serial_baud);
+            error!("Invalid baud rate '{}' specified.", serial_baud);
             process::exit(ExitCode::ArgumentError as i32);
         }
         open_button.set_active(true);
     } else if !serial_port_name.is_empty() {
-        println!("ERROR: A baud rate must be specified.");
+        error!("A baud rate must be specified.");
         process::exit(ExitCode::ArgumentError as i32);
     } else if !serial_baud.is_empty() {
-        println!("ERROR: A port name must be specified.");
+        error!("A port name must be specified.");
         process::exit(ExitCode::ArgumentError as i32);
     }
 
@@ -642,7 +647,7 @@ fn receive() -> glib::Continue {
                     state.connected = true;
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
-                    println!("OpenPortError: {}", s);
+                    debug!("OpenPortError: {}", s);
                     let dialog = gtk::MessageDialog::new(Some(window),
                                                          gtk::DIALOG_DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
@@ -658,7 +663,7 @@ fn receive() -> glib::Continue {
                 }
                 Ok(SerialResponse::SendingFileComplete) |
                 Ok(SerialResponse::SendingFileCanceled) => {
-                    println!("Sending file complete");
+                    info!("Sending file complete");
                     f_button.set_active(false);
                     view.set_editable(true);
                 }
@@ -698,7 +703,7 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
 		            if let Some((_, ref serial_thread, _)) = *global.borrow() {
 		                match serial_thread.send_port_file_cmd(filename) {
 		                    Err(_) => {
-		                        println!("Error sending port_file command to \
+		                        error!("Error sending port_file command to \
 		                                  child thread. Aborting.");
 		                        b.set_sensitive(true);
 		                        b.set_active(false);
@@ -713,7 +718,7 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
             } else {
                 match serial_thread.send_cancel_file_cmd() {
                     Err(GeneralError::Send(_)) => {
-                        println!("Error sending cancel_file command to child \
+                        error!("Error sending cancel_file command to child \
                                   thread. Aborting.");
                     }
                     Err(_) | Ok(_) => (),

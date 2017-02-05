@@ -73,7 +73,7 @@ impl SerialThread {
                 // First check if we have any incoming commands
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                        println!("Connecting to {} at {} with settings {:?}", &name, baud, &settings);
+                        info!("Connecting to {} at {} with settings {:?}", &name, baud, &settings);
                         match serialport::open_with_settings(&name, &settings) {
                             Ok(p) => {
                                 port = Some(p);
@@ -89,7 +89,7 @@ impl SerialThread {
                         callback();
                     },
                     Ok(SerialCommand::ChangeBaud(baud)) => {
-                        println!("Changing baud to {}", baud);
+                        info!("Changing baud to {}", baud);
                         let baud_rate = BaudRate::from_speed(baud);
                         settings.baud_rate = baud_rate;
                         if let Some(ref mut p) = port {
@@ -97,28 +97,28 @@ impl SerialThread {
                         }
                     },
                     Ok(SerialCommand::ChangeDataBits(data_bits)) => {
-                        println!("Changing data bits to {:?}", data_bits);
+                        info!("Changing data bits to {:?}", data_bits);
                         settings.data_bits = data_bits;
                         if let Some(ref mut p) = port {
                             p.set_data_bits(data_bits).unwrap();
                         }
                     },
                     Ok(SerialCommand::ChangeFlowControl(flow_control)) => {
-                        println!("Changing flow control to {:?}", flow_control);
+                        info!("Changing flow control to {:?}", flow_control);
                         settings.flow_control = flow_control;
                         if let Some(ref mut p) = port {
                             p.set_flow_control(flow_control).unwrap();
                         }
                     },
                     Ok(SerialCommand::ChangeStopBits(stop_bits)) => {
-                        println!("Changing stop bits to {:?}", stop_bits);
+                        info!("Changing stop bits to {:?}", stop_bits);
                         settings.stop_bits = stop_bits;
                         if let Some(ref mut p) = port {
                             p.set_stop_bits(stop_bits).unwrap();
                         }
                     },
                     Ok(SerialCommand::ChangeParity(parity)) => {
-                        println!("Changing parity to {:?}", parity);
+                        info!("Changing parity to {:?}", parity);
                         settings.parity = parity;
                         if let Some(ref mut p) = port {
                             p.set_parity(parity).unwrap();
@@ -126,7 +126,7 @@ impl SerialThread {
                     },
                     Ok(SerialCommand::ChangePort(name)) => {
                         if port.is_some() {
-                            println!("Changing port to '{}' using settings {:?}", &name, &settings);
+                            info!("Changing port to '{}' using settings {:?}", &name, &settings);
 
                             match serialport::open_with_settings(&name, &settings) {
                                 Ok(p) => {
@@ -142,7 +142,7 @@ impl SerialThread {
                         }
                     },
                     Ok(SerialCommand::Disconnect) => {
-                        println!("Disconnecting");
+                        info!("Disconnecting");
                         port = None;
                         read_file = None;
                         from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
@@ -152,13 +152,13 @@ impl SerialThread {
                         if let Some(ref mut p) = port {
                             match p.write(d.as_ref()) {
                                 Ok(_) => (),
-                                Err(e) => println!("Error in SendData: {:?}", e),
+                                Err(e) => error!("Error in SendData: {:?}", e),
                             }
                         }
                     },
                     Ok(SerialCommand::SendFile(f)) => {
                         if port.is_some() {
-                            println!("Sending file {:?}", f);
+                            info!("Sending file {:?}", f);
                             if let Ok(new_file) = File::open(f) {
                                 read_file = Some(Box::new(new_file));
                             }
@@ -207,11 +207,11 @@ impl SerialThread {
                             let tx_data_len = p.baud_rate().unwrap().speed() /
                                               byte_as_serial_bits /
                                               (1000 / data_packet_time as usize);
-                            println!("Reading {} bytes", tx_data_len);
+                            info!("Reading {} bytes", tx_data_len);
                             if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
                                 read_len = Some(len);
                             } else {
-                                println!("Failed to read {} bytes", tx_data_len);
+                                error!("Failed to read {} bytes", tx_data_len);
                             }
                         } else {
                             read_len = Some(0);
@@ -222,7 +222,7 @@ impl SerialThread {
                         Some(x) => {
                             if x > 0 {
                                 if p.write(&serial_buf_rx[..x]).is_err() {
-                                    println!("Failed to send {} bytes", x);
+                                    error!("Failed to send {} bytes", x);
                                     read_file = None;
                                 }
                                 last_send_time = Instant::now();
