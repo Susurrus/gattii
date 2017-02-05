@@ -11,23 +11,24 @@ cache:
 before_script:
     - mkdir -pv $APT_CACHE_DIR
     - apt-get -qq update && apt-get -o dir::cache::archives="$APT_CACHE_DIR" -qq -y install libudev-dev libgtk-3-dev
+    - curl https://sh.rustup.rs -sSf > rustup.sh
+    - chmod +x rustup.sh
+    - export PATH="~/.cargo/bin:$PATH"
 
 test:1.13:
-    image: "scorpil/rust:1.13"
+    image: "debian:testing"
     script:
+    - ./rustup.sh -y --default-toolchain=1.13
     - cargo build --verbose
 
 test:stable:
-    image: "scorpil/rust:stable"
+    image: "debian:testing"
     script:
-    - cargo build --verbose
-
-test:beta:
-    image: "scorpil/rust:beta"
-    script:
+    - ./rustup.sh -y --default-toolchain=stable
     - cargo build --verbose
 
 test:nightly:
-    image: "scorpil/rust:nightly"
+    image: "debian:testing"
     script:
+    - ./rustup.sh -y --default-toolchain=nightly
     - cargo build --verbose
