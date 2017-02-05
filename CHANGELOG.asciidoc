@@ -16,6 +16,8 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 
 ==== Changed
 * "Paste" option in the right-click menu only active if a port is open
+* Output is now sorted into an appropriate error level and only error-level messages
+  are enabled by default.
 
 === [0.2.0] - 2017-01-31
 ==== Added
