@@ -34,6 +34,9 @@ test:stable:
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
     - cargo build --verbose
+    # Also run rustfmt checks on stable
+    - cargo install rustfmt
+    - cargo fmt -- --write-mode=diff
 
 test:nightly:
     image: "debian:testing"
