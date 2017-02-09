@@ -18,7 +18,7 @@ pub enum SerialCommand {
     ChangeFlowControl(FlowControl),
     ChangeStopBits(StopBits),
     ChangeParity(Parity),
-    ChangePort(String), ///
+    ChangePort(String),
     ConnectToPort { name: String, baud: usize },
     Disconnect,
     SendData(Vec<u8>),
@@ -177,19 +177,23 @@ impl SerialThread {
                     Err(TryRecvError::Disconnected) => (),
                 }
 
+                // If a port is active, handle reading and writing to it.
                 if let Some(ref mut p) = port {
+                    // Read data from the port
                     let rx_data_len = match p.read(serial_buf.as_mut_slice()) {
                         Ok(t) => t,
                         Err(_) => 0,
                     };
+
+                    // And send this data over the channel
                     if rx_data_len > 0 {
                         let send_data = SerialResponse::Data(serial_buf[..rx_data_len].to_vec());
                         from_port_chan_tx.send(send_data).unwrap();
                         callback();
                     }
 
-                    // If a file has been opened, read the next 1ms of data from it as
-                    // determined by the current baud rate.
+                    // If a file has been opened, read the next 1ms of data from
+                    // it as determined by the current baud rate.
                     let mut read_len: Option<usize> = None;
                     if let Some(ref mut file) = read_file {
                         let mut byte_as_serial_bits = 1 + 8;
