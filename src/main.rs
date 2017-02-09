@@ -248,6 +248,7 @@ fn main() {
     separator.set_expand(true);
     toolbar.add(&separator);
     let send_file_button = gtk::ToggleButton::new();
+    send_file_button.set_tooltip_text(Some("Transmit file"));
     // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
     // is resolved
     let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
