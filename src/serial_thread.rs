@@ -246,7 +246,7 @@ impl SerialThread {
                             let tx_data_len = p.baud_rate().unwrap().speed() /
                                               byte_as_serial_bits /
                                               (1000 / data_packet_time as usize);
-                            info!("Reading {} bytes", tx_data_len);
+                            debug!("Reading {} bytes", tx_data_len);
                             if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
                                 read_len = Some(len);
                             } else {
