@@ -55,6 +55,7 @@ struct Ui {
     text_buffer: gtk::TextBuffer,
     file_button: gtk::ToggleButton,
     open_button: gtk::ToggleButton,
+    save_button: gtk::ToggleButton,
     data_bits_scale: gtk::Scale,
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
@@ -63,6 +64,7 @@ struct Ui {
     text_buffer_delete_signal: u64,
     open_button_clicked_signal: u64,
     file_button_toggled_signal: u64,
+    save_button_toggled_signal: u64,
 }
 
 struct State {
@@ -255,6 +257,18 @@ fn main() {
     send_file_button_container.add(&send_file_button);
     toolbar.add(&send_file_button_container);
 
+    // Add save file button
+    let save_file_button = gtk::ToggleButton::new();
+    save_file_button.set_tooltip_text(Some("Record to file"));
+    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
+    // is resolved
+    let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    save_file_button.set_image(&save_file_image);
+    save_file_button.set_sensitive(false);
+    let save_file_button_container = gtk::ToolItem::new();
+    save_file_button_container.add(&save_file_button);
+    toolbar.add(&save_file_button_container);
+
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
     vbox.pack_start(&toolbar, false, false, 0);
@@ -269,6 +283,7 @@ fn main() {
         text_buffer: buffer.clone(),
         file_button: send_file_button.clone(),
         open_button: open_button.clone(),
+        save_button: save_file_button.clone(),
         data_bits_scale: data_bits_scale.clone(),
         stop_bits_scale: stop_bits_scale.clone(),
         parity_dropdown: parity_dropdown.clone(),
@@ -277,6 +292,7 @@ fn main() {
         text_buffer_delete_signal: 0,
         open_button_clicked_signal: 0,
         file_button_toggled_signal: 0,
+        save_button_toggled_signal: 0,
     };
     let state = State {
         connected: false
@@ -362,6 +378,10 @@ fn main() {
             // Connect send file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
             ui.file_button_toggled_signal = ui.file_button.connect_toggled(file_button_connect_toggled);
+
+            // Connect log file selector button to callback. This is left as a
+            // separate function to reduce rightward drift.
+            ui.save_button_toggled_signal = ui.save_button.connect_toggled(save_button_connect_toggled);
 
             // Configure the data bits callback
             ui.data_bits_scale.connect_value_changed(|s| {
@@ -618,6 +638,7 @@ fn receive() -> glib::Continue {
             let view = &ui.text_view;
             let buf = &ui.text_buffer;
             let f_button = &ui.file_button;
+            let s_button = &ui.save_button;
             let o_button = &ui.open_button;
             match serial_thread.from_port_chan_rx.try_recv() {
                 Ok(SerialResponse::Data(data)) => {
@@ -641,10 +662,15 @@ fn receive() -> glib::Continue {
                 Ok(SerialResponse::DisconnectSuccess) => {
                     f_button.set_sensitive(false);
                     f_button.set_active(false);
+                    s_button.set_sensitive(false);
+                    signal_handler_block(s_button, ui.save_button_toggled_signal);
+                    s_button.set_active(false);
+                    signal_handler_unblock(s_button, ui.save_button_toggled_signal);
                     state.connected = false;
                 }
                 Ok(SerialResponse::OpenPortSuccess) => {
                     f_button.set_sensitive(true);
+                    s_button.set_sensitive(true);
                     o_button.set_active(true);
                     state.connected = true;
                 }
@@ -658,6 +684,7 @@ fn receive() -> glib::Continue {
                     dialog.run();
                     dialog.destroy();
                     f_button.set_sensitive(false);
+                    s_button.set_sensitive(false);
                     signal_handler_block(o_button, ui.open_button_clicked_signal);
                     o_button.set_active(false);
                     signal_handler_unblock(o_button, ui.open_button_clicked_signal);
@@ -679,6 +706,20 @@ fn receive() -> glib::Continue {
                                                          "Error sending file");
                     dialog.run();
                     dialog.destroy();
+                }
+                Ok(SerialResponse::LogToFileError(_)) => {
+                    s_button.set_active(false);
+                    let dialog = gtk::MessageDialog::new(Some(window),
+                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         gtk::MessageType::Error,
+                                                         gtk::ButtonsType::Ok,
+                                                         "Error logging to file");
+                    dialog.run();
+                    dialog.destroy();
+                }
+                Ok(SerialResponse::LoggingFileCanceled) => {
+                    info!("Logging file canceled");
+                    s_button.set_active(false);
                 }
                 Err(_) => (),
             }
@@ -729,6 +770,49 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 match serial_thread.send_cancel_file_cmd() {
                     Err(GeneralError::Send(_)) => {
                         error!("Error sending cancel_file command to child \
+                                  thread. Aborting.");
+                    }
+                    Err(_) | Ok(_) => (),
+                }
+            }
+        }
+    });
+}
+
+fn save_button_connect_toggled(b: &gtk::ToggleButton) {
+    GLOBAL.with(|global| {
+        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
+            let window = &ui.window;
+            if b.get_active() {
+                let dialog = gtk::FileChooserDialog::new(Some("Log to File"),
+                                                         Some(window),
+                                                         gtk::FileChooserAction::Save);
+                dialog.add_buttons(&[("Log", gtk::ResponseType::Ok.into()),
+                                     ("Cancel", gtk::ResponseType::Cancel.into())]);
+                let result = dialog.run();
+                if result == gtk::ResponseType::Ok.into() {
+                    let filename = dialog.get_filename().unwrap();
+                    if serial_thread.send_log_to_file_cmd(filename).is_err() {
+                        error!("Error sending log_to_file command to child \
+                                thread. Aborting.");
+                        b.set_sensitive(true);
+                        b.set_active(false);
+                    }
+                } else {
+                    // Make the button look inactive if the user canceled the
+                    // file save dialog
+                    signal_handler_block(&ui.save_button,
+                                         ui.save_button_toggled_signal);
+                    b.set_active(false);
+                    signal_handler_unblock(&ui.save_button,
+                                           ui.save_button_toggled_signal);
+                }
+
+                dialog.destroy();
+            } else {
+                match serial_thread.send_cancel_log_to_file_cmd() {
+                    Err(GeneralError::Send(_)) => {
+                        error!("Error sending cancel_log_to_file command to child \
                                   thread. Aborting.");
                     }
                     Err(_) | Ok(_) => (),

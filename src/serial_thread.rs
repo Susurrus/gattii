@@ -23,6 +23,8 @@ pub enum SerialCommand {
     Disconnect,
     SendData(Vec<u8>),
     SendFile(PathBuf),
+    LogToFile(PathBuf),
+    CancelLogToFile,
 }
 
 pub enum SerialResponse {
@@ -33,6 +35,8 @@ pub enum SerialResponse {
     OpenPortSuccess,
     OpenPortError(String),
     DisconnectSuccess,
+    LogToFileError(String),
+    LoggingFileCanceled,
 }
 
 pub enum GeneralError {
@@ -63,6 +67,7 @@ impl SerialThread {
         thread::spawn(move || {
             let mut port: Option<Box<SerialPort>> = None;
             let mut read_file: Option<Box<File>> = None;
+            let mut write_file: Option<Box<File>> = None;
 
             let mut serial_buf: Vec<u8> = vec![0; 1000];
             let mut serial_buf_rx = [0; 1000];
@@ -145,6 +150,7 @@ impl SerialThread {
                         info!("Disconnecting");
                         port = None;
                         read_file = None;
+                        write_file = None;
                         from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
                         callback();
                     },
@@ -173,6 +179,23 @@ impl SerialThread {
                         from_port_chan_tx.send(SerialResponse::SendingFileCanceled).unwrap();
                         callback();
                     },
+                    Ok(SerialCommand::LogToFile(f)) => {
+                        if port.is_some() {
+                            info!("Logging to file {:?}", f);
+                            match File::create(f) {
+                                Ok(file) => write_file = Some(Box::new(file)),
+                                Err(e) => error!("{:?}", e)
+                            }
+                        } else {
+                            from_port_chan_tx.send(SerialResponse::LogToFileError(String::from("No open port to log file from!"))).unwrap();
+                            callback();
+                        }
+                    },
+                    Ok(SerialCommand::CancelLogToFile) => {
+                        write_file = None;
+                        from_port_chan_tx.send(SerialResponse::LoggingFileCanceled).unwrap();
+                        callback();
+                    },
                     Err(TryRecvError::Empty) |
                     Err(TryRecvError::Disconnected) => (),
                 }
@@ -190,6 +213,17 @@ impl SerialThread {
                         let send_data = SerialResponse::Data(serial_buf[..rx_data_len].to_vec());
                         from_port_chan_tx.send(send_data).unwrap();
                         callback();
+
+                        // Write the data to a log file if one's set up
+                        if let Some(ref mut file) = write_file {
+                            match file.write(&serial_buf[..rx_data_len]) {
+                                Err(e) => error!("{:?}", e),
+                                Ok(l) => if l < rx_data_len {
+                                    warn!("Only {}/{} bytes logged", l,
+                                           rx_data_len);
+                                }
+                            }
+                        }
                     }
 
                     // If a file has been opened, read the next 1ms of data from
@@ -324,6 +358,18 @@ impl SerialThread {
     pub fn send_cancel_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_log_to_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::LogToFile(path)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        Ok(())
+    }
+
+    pub fn send_cancel_log_to_file_cmd(&self) -> Result<(), GeneralError> {
+        let tx = &self.to_port_chan_tx;
+        tx.send(SerialCommand::CancelLogToFile).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
     }
 }
