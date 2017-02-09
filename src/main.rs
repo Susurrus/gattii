@@ -62,6 +62,7 @@ struct Ui {
     text_view_insert_signal: u64,
     text_buffer_delete_signal: u64,
     open_button_clicked_signal: u64,
+    file_button_toggled_signal: u64,
 }
 
 struct State {
@@ -274,7 +275,8 @@ fn main() {
         flow_control_dropdown: flow_control_dropdown.clone(),
         text_view_insert_signal: 0,
         text_buffer_delete_signal: 0,
-        open_button_clicked_signal: 0
+        open_button_clicked_signal: 0,
+        file_button_toggled_signal: 0,
     };
     let state = State {
         connected: false
@@ -356,10 +358,10 @@ fn main() {
     }));
 
     GLOBAL.with(|global| {
-        if let Some((ref ui, _, _)) = *global.borrow() {
-            // Connect file selector button to callback. This is left as a
+        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
+            // Connect send file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
-            ui.file_button.connect_toggled(file_button_connect_toggled);
+            ui.file_button_toggled_signal = ui.file_button.connect_toggled(file_button_connect_toggled);
 
             // Configure the data bits callback
             ui.data_bits_scale.connect_value_changed(|s| {
@@ -700,18 +702,26 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
                     GLOBAL.with(|global| {
-		            if let Some((_, ref serial_thread, _)) = *global.borrow() {
-		                match serial_thread.send_port_file_cmd(filename) {
-		                    Err(_) => {
-		                        error!("Error sending port_file command to \
-		                                  child thread. Aborting.");
-		                        b.set_sensitive(true);
-		                        b.set_active(false);
-		                    },
-		                    Ok(_) => view.set_editable(false)
+		                if let Some((_, ref serial_thread, _)) = *global.borrow() {
+		                    match serial_thread.send_port_file_cmd(filename) {
+		                        Err(_) => {
+		                            error!("Error sending port_file command to \
+		                                      child thread. Aborting.");
+		                            b.set_sensitive(true);
+		                            b.set_active(false);
+		                        },
+		                        Ok(_) => view.set_editable(false)
+		                    }
 		                }
-		            }
-		        });
+		            });
+                } else {
+                    // Make the button look inactive if the user canceled the
+                    // file open dialog
+                    signal_handler_block(&ui.file_button,
+                                         ui.file_button_toggled_signal);
+                    b.set_active(false);
+                    signal_handler_unblock(&ui.file_button,
+                                           ui.file_button_toggled_signal);
                 }
 
                 dialog.destroy();
