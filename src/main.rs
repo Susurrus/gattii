@@ -661,7 +661,9 @@ fn receive() -> glib::Continue {
                 }
                 Ok(SerialResponse::DisconnectSuccess) => {
                     f_button.set_sensitive(false);
+                    signal_handler_block(f_button, ui.file_button_toggled_signal);
                     f_button.set_active(false);
+                    signal_handler_unblock(f_button, ui.file_button_toggled_signal);
                     s_button.set_sensitive(false);
                     signal_handler_block(s_button, ui.save_button_toggled_signal);
                     s_button.set_active(false);
