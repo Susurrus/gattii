@@ -744,19 +744,15 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 let result = dialog.run();
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
-                    GLOBAL.with(|global| {
-		                if let Some((_, ref serial_thread, _)) = *global.borrow() {
-		                    match serial_thread.send_port_file_cmd(filename) {
-		                        Err(_) => {
-		                            error!("Error sending port_file command to \
-		                                      child thread. Aborting.");
-		                            b.set_sensitive(true);
-		                            b.set_active(false);
-		                        },
-		                        Ok(_) => view.set_editable(false)
-		                    }
-		                }
-		            });
+                    match serial_thread.send_port_file_cmd(filename) {
+                        Err(_) => {
+                            error!("Error sending port_file command to child \
+                                    thread. Aborting.");
+                            b.set_sensitive(true);
+                            b.set_active(false);
+                        },
+                        Ok(_) => view.set_editable(false)
+                    }
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file open dialog
