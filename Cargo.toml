@@ -17,9 +17,9 @@ appveyor = { repository = "Susurrus/gattii", service = "gitlab" }
 argparse = "0.2"
 env_logger = "0.4"
 log = "0.3"
-glib = "0.1"
+glib = { git = "https://github.com/gtk-rs/glib" }
 serialport = "0.3"
 
 [dependencies.gtk]
-version = "0.1"
+git = "https://github.com/gtk-rs/gtk"
 features = ["v3_20"]
