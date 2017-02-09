@@ -159,8 +159,9 @@ impl SerialThread {
                     Ok(SerialCommand::SendFile(f)) => {
                         if port.is_some() {
                             info!("Sending file {:?}", f);
-                            if let Ok(new_file) = File::open(f) {
-                                read_file = Some(Box::new(new_file));
+                            match File::open(f) {
+                                Ok(file) => read_file = Some(Box::new(file)),
+                                Err(e) => error!("{:?}", e)
                             }
                         } else {
                             from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
