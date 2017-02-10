@@ -28,9 +28,10 @@ Screenshots
 Functionality
 =============
 
-Gattii is currently **BETA-LEVEL SOFTWARE**! This is as much a learning experience for me as it is a productive piece of software. This project is under active and frequent development. There are many known and unknown problems as well as missing functionality. Additionally this project pushes the limits of several packages (gtk-rs and serialport-rs especially) and as such development may be slow at times.
-
-That being said, the current functionality is sufficient for basic ASCII/UTF-8 interaction with the serial port. Opening and changing ports and baud rates, reading and writing textual data, and sending files is all possible.
+ * Enumerate ports
+ * Modify settings/change ports in 1-click
+ * Transmit file
+ * Log to file
 
 Software Requirements
 =====================
