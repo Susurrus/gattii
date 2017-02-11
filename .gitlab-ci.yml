@@ -37,6 +37,7 @@ test:stable:
     - cargo build --verbose
     # Also run rustfmt checks on stable
     - cargo install rustfmt
+    - echo $PATH
     - cargo fmt -- --write-mode=diff
 
 test:stable_i686:
