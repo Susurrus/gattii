@@ -38,6 +38,7 @@ test:stable:
     # Also run rustfmt checks on stable
     - cargo install rustfmt
     - echo $PATH
+    - readlink -f ~
     - cargo fmt -- --write-mode=diff
 
 test:stable_i686:
