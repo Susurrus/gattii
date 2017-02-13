@@ -50,3 +50,6 @@ test:nightly:
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
     - cargo build --verbose
+    # Also run clippy on nightly
+    - cargo install clippy
+    - cargo clippy -- --allow=cyclomatic_complexity
