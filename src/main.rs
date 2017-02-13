@@ -3,7 +3,8 @@
 extern crate argparse;
 extern crate core;
 extern crate env_logger;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate gtk;
 extern crate glib;
 
@@ -294,15 +295,10 @@ fn main() {
         file_button_toggled_signal: 0,
         save_button_toggled_signal: 0,
     };
-    let state = State {
-        connected: false
-    };
+    let state = State { connected: false };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui,
-                                     SerialThread::new(|| {
-                                         glib::idle_add(receive);
-                                     }),
-                                     state));
+        *global.borrow_mut() =
+            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
     });
 
     baud_selector.connect_changed(move |s| {
@@ -377,11 +373,13 @@ fn main() {
         if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
             // Connect send file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
-            ui.file_button_toggled_signal = ui.file_button.connect_toggled(file_button_connect_toggled);
+            ui.file_button_toggled_signal = ui.file_button
+                .connect_toggled(file_button_connect_toggled);
 
             // Connect log file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
-            ui.save_button_toggled_signal = ui.save_button.connect_toggled(save_button_connect_toggled);
+            ui.save_button_toggled_signal = ui.save_button
+                .connect_toggled(save_button_connect_toggled);
 
             // Configure the data bits callback
             ui.data_bits_scale.connect_value_changed(|s| {
