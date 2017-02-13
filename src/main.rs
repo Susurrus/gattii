@@ -297,8 +297,11 @@ fn main() {
     };
     let state = State { connected: false };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() =
-            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+        *global.borrow_mut() = Some((ui,
+                                     SerialThread::new(|| {
+                                         glib::idle_add(receive);
+                                     }),
+                                     state));
     });
 
     baud_selector.connect_changed(move |s| {
@@ -439,7 +442,7 @@ fn main() {
                 };
                 if let Some(parity) = parity {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread,  _)) = *global.borrow() {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_parity_cmd(parity) {
                                 Err(GeneralError::Parse(_)) => {
                                     unreachable!();
@@ -744,29 +747,25 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                     let filename = dialog.get_filename().unwrap();
                     match serial_thread.send_port_file_cmd(filename) {
                         Err(_) => {
-                            error!("Error sending port_file command to child \
-                                    thread. Aborting.");
+                            error!("Error sending port_file command to child thread. Aborting.");
                             b.set_sensitive(true);
                             b.set_active(false);
-                        },
-                        Ok(_) => view.set_editable(false)
+                        }
+                        Ok(_) => view.set_editable(false),
                     }
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file open dialog
-                    signal_handler_block(&ui.file_button,
-                                         ui.file_button_toggled_signal);
+                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
                     b.set_active(false);
-                    signal_handler_unblock(&ui.file_button,
-                                           ui.file_button_toggled_signal);
+                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                 }
 
                 dialog.destroy();
             } else {
                 match serial_thread.send_cancel_file_cmd() {
                     Err(GeneralError::Send(_)) => {
-                        error!("Error sending cancel_file command to child \
-                                thread. Aborting.");
+                        error!("Error sending cancel_file command to child thread. Aborting.");
                     }
                     Err(_) | Ok(_) => (),
                 }
@@ -797,19 +796,17 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file save dialog
-                    signal_handler_block(&ui.save_button,
-                                         ui.save_button_toggled_signal);
+                    signal_handler_block(&ui.save_button, ui.save_button_toggled_signal);
                     b.set_active(false);
-                    signal_handler_unblock(&ui.save_button,
-                                           ui.save_button_toggled_signal);
+                    signal_handler_unblock(&ui.save_button, ui.save_button_toggled_signal);
                 }
 
                 dialog.destroy();
             } else {
                 match serial_thread.send_cancel_log_to_file_cmd() {
                     Err(GeneralError::Send(_)) => {
-                        error!("Error sending cancel_log_to_file command to \
-                                child thread. Aborting.");
+                        error!("Error sending cancel_log_to_file command to child thread. \
+                                Aborting.");
                     }
                     Err(_) | Ok(_) => (),
                 }

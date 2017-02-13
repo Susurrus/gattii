@@ -52,7 +52,7 @@ pub struct SerialThread {
 pub fn list_ports() -> serialport::Result<Vec<String>> {
     match serialport::available_ports() {
         Ok(ports) => Ok(ports.into_iter().map(|x| x.port_name).collect()),
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
 }
 
@@ -78,21 +78,25 @@ impl SerialThread {
                 // First check if we have any incoming commands
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                        info!("Connecting to {} at {} with settings {:?}", &name, baud, &settings);
+                        info!("Connecting to {} at {} with settings {:?}",
+                              &name,
+                              baud,
+                              &settings);
                         match serialport::open_with_settings(&name, &settings) {
                             Ok(p) => {
                                 port = Some(p);
                                 from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
-                            },
+                            }
                             Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
                                 from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Port '{}' is already in use or doesn't exist", &name)))).unwrap();
-                            },
+                            }
                             Err(e) => {
-                                from_port_chan_tx.send(SerialResponse::OpenPortError(e.description)).unwrap();
+                                from_port_chan_tx.send(SerialResponse::OpenPortError(e.description))
+                                    .unwrap();
                             }
                         }
                         callback();
-                    },
+                    }
                     Ok(SerialCommand::ChangeBaud(baud)) => {
                         info!("Changing baud to {}", baud);
                         let baud_rate = BaudRate::from_speed(baud);
@@ -100,44 +104,47 @@ impl SerialThread {
                         if let Some(ref mut p) = port {
                             p.set_baud_rate(baud_rate).unwrap();
                         }
-                    },
+                    }
                     Ok(SerialCommand::ChangeDataBits(data_bits)) => {
                         info!("Changing data bits to {:?}", data_bits);
                         settings.data_bits = data_bits;
                         if let Some(ref mut p) = port {
                             p.set_data_bits(data_bits).unwrap();
                         }
-                    },
+                    }
                     Ok(SerialCommand::ChangeFlowControl(flow_control)) => {
                         info!("Changing flow control to {:?}", flow_control);
                         settings.flow_control = flow_control;
                         if let Some(ref mut p) = port {
                             p.set_flow_control(flow_control).unwrap();
                         }
-                    },
+                    }
                     Ok(SerialCommand::ChangeStopBits(stop_bits)) => {
                         info!("Changing stop bits to {:?}", stop_bits);
                         settings.stop_bits = stop_bits;
                         if let Some(ref mut p) = port {
                             p.set_stop_bits(stop_bits).unwrap();
                         }
-                    },
+                    }
                     Ok(SerialCommand::ChangeParity(parity)) => {
                         info!("Changing parity to {:?}", parity);
                         settings.parity = parity;
                         if let Some(ref mut p) = port {
                             p.set_parity(parity).unwrap();
                         }
-                    },
+                    }
                     Ok(SerialCommand::ChangePort(name)) => {
                         if port.is_some() {
-                            info!("Changing port to '{}' using settings {:?}", &name, &settings);
+                            info!("Changing port to '{}' using settings {:?}",
+                                  &name,
+                                  &settings);
 
                             match serialport::open_with_settings(&name, &settings) {
                                 Ok(p) => {
                                     port = Some(p);
-                                    from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
-                                },
+                                    from_port_chan_tx.send(SerialResponse::OpenPortSuccess)
+                                        .unwrap();
+                                }
                                 Err(_) => {
                                     port = None;
                                     from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
@@ -145,7 +152,7 @@ impl SerialThread {
                                 }
                             }
                         }
-                    },
+                    }
                     Ok(SerialCommand::Disconnect) => {
                         info!("Disconnecting");
                         port = None;
@@ -153,7 +160,7 @@ impl SerialThread {
                         write_file = None;
                         from_port_chan_tx.send(SerialResponse::DisconnectSuccess).unwrap();
                         callback();
-                    },
+                    }
                     Ok(SerialCommand::SendData(d)) => {
                         if let Some(ref mut p) = port {
                             match p.write(d.as_ref()) {
@@ -161,41 +168,41 @@ impl SerialThread {
                                 Err(e) => error!("Error in SendData: {:?}", e),
                             }
                         }
-                    },
+                    }
                     Ok(SerialCommand::SendFile(f)) => {
                         if port.is_some() {
                             info!("Sending file {:?}", f);
                             match File::open(f) {
                                 Ok(file) => read_file = Some(Box::new(file)),
-                                Err(e) => error!("{:?}", e)
+                                Err(e) => error!("{:?}", e),
                             }
                         } else {
                             from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
                             callback();
                         }
-                    },
+                    }
                     Ok(SerialCommand::CancelSendFile) => {
                         read_file = None;
                         from_port_chan_tx.send(SerialResponse::SendingFileCanceled).unwrap();
                         callback();
-                    },
+                    }
                     Ok(SerialCommand::LogToFile(f)) => {
                         if port.is_some() {
                             info!("Logging to file {:?}", f);
                             match File::create(f) {
                                 Ok(file) => write_file = Some(Box::new(file)),
-                                Err(e) => error!("{:?}", e)
+                                Err(e) => error!("{:?}", e),
                             }
                         } else {
                             from_port_chan_tx.send(SerialResponse::LogToFileError(String::from("No open port to log file from!"))).unwrap();
                             callback();
                         }
-                    },
+                    }
                     Ok(SerialCommand::CancelLogToFile) => {
                         write_file = None;
                         from_port_chan_tx.send(SerialResponse::LoggingFileCanceled).unwrap();
                         callback();
-                    },
+                    }
                     Err(TryRecvError::Empty) |
                     Err(TryRecvError::Disconnected) => (),
                 }
@@ -218,9 +225,10 @@ impl SerialThread {
                         if let Some(ref mut file) = write_file {
                             match file.write(&serial_buf[..rx_data_len]) {
                                 Err(e) => error!("{:?}", e),
-                                Ok(l) => if l < rx_data_len {
-                                    warn!("Only {}/{} bytes logged", l,
-                                           rx_data_len);
+                                Ok(l) => {
+                                    if l < rx_data_len {
+                                        warn!("Only {}/{} bytes logged", l, rx_data_len);
+                                    }
                                 }
                             }
                         }
@@ -243,8 +251,7 @@ impl SerialThread {
                         // variation
                         let data_packet_time = 10; // ms
                         if last_send_time.elapsed().subsec_nanos() > data_packet_time * 1_000_000 {
-                            let tx_data_len = p.baud_rate().unwrap().speed() /
-                                              byte_as_serial_bits /
+                            let tx_data_len = p.baud_rate().unwrap().speed() / byte_as_serial_bits /
                                               (1000 / data_packet_time as usize);
                             debug!("Reading {} bytes", tx_data_len);
                             if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
@@ -319,7 +326,9 @@ impl SerialThread {
         Ok(())
     }
 
-    pub fn send_port_change_flow_control_cmd(&self, flow_control: FlowControl) -> Result<(), GeneralError> {
+    pub fn send_port_change_flow_control_cmd(&self,
+                                             flow_control: FlowControl)
+                                             -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         tx.send(SerialCommand::ChangeFlowControl(flow_control)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
         Ok(())
