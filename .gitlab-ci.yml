@@ -23,7 +23,7 @@ test:1.13:
     - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
-    - ./cargo build --verbose
+    - cargo build --verbose
 
 test:stable:
     image: "debian:testing"
@@ -34,10 +34,10 @@ test:stable:
     - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
-    - ./cargo build --verbose
+    - cargo build --verbose
     # Also run rustfmt checks on stable
     - cargo install rustfmt
-    - ./cargo fmt -- --write-mode=diff
+    - cargo fmt -- --write-mode=diff
 
 test:nightly:
     image: "debian:testing"
@@ -49,4 +49,4 @@ test:nightly:
     - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
-    - ./cargo build --verbose
+    - cargo build --verbose
