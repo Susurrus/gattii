@@ -342,7 +342,8 @@ fn main() {
         }
     });
 
-    let open_button_clicked_signal = open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
+    let open_button_clicked_signal =
+        open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
         if s.get_active() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
@@ -364,7 +365,8 @@ fn main() {
             GLOBAL.with(|global| {
                 if let Some((_, ref serial_thread, _)) = *global.borrow() {
                     match serial_thread.send_port_close_cmd() {
-                        Err(GeneralError::Send(_)) => error!("Error sending port_close command to child thread. Aborting."),
+                        Err(GeneralError::Send(_)) => error!("Error sending port_close command to \
+                                                              child thread. Aborting."),
                         Err(_) | Ok(_) => ()
                     }
                 }

@@ -62,8 +62,9 @@ impl SerialThread {
         let (from_port_chan_tx, from_port_chan_rx) = channel();
         let (to_port_chan_tx, to_port_chan_rx) = channel();
 
-        // Open a thread to monitor the active serial channel. This thread is always-running and listening
-        // for various port-related commands, but is not necessarily always connected to the port.
+        // Open a thread to monitor the active serial channel. This thread is always-running and
+        // listening for various port-related commands, but is not necessarily always connected to
+        // the port.
         thread::spawn(move || {
             let mut port: Option<Box<SerialPort>> = None;
             let mut read_file: Option<Box<File>> = None;
@@ -88,7 +89,10 @@ impl SerialThread {
                                 from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
                             }
                             Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
-                                from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Port '{}' is already in use or doesn't exist", &name)))).unwrap();
+			        let err_str = String::from(format!("Port '{}' is already in use \
+                                                                    or doesn't exist", &name));
+                                let error = SerialResponse::OpenPortError(err_str);
+                                from_port_chan_tx.send(error).unwrap();
                             }
                             Err(e) => {
                                 from_port_chan_tx.send(SerialResponse::OpenPortError(e.description))
@@ -147,7 +151,10 @@ impl SerialThread {
                                 }
                                 Err(_) => {
                                     port = None;
-                                    from_port_chan_tx.send(SerialResponse::OpenPortError(String::from(format!("Failed to open port '{}'", &name)))).unwrap();
+                                    let err_str = String::from(format!("Failed to open port '{}'",
+                                                                       &name));
+                                    let error = SerialResponse::OpenPortError(err_str);
+                                    from_port_chan_tx.send(error).unwrap();
                                     callback();
                                 }
                             }
@@ -177,7 +184,9 @@ impl SerialThread {
                                 Err(e) => error!("{:?}", e),
                             }
                         } else {
-                            from_port_chan_tx.send(SerialResponse::SendingFileError(String::from("No open port to send file!"))).unwrap();
+                            let err_str = String::from("No open port to send file");
+                            let error = SerialResponse::SendingFileError(err_str);
+                            from_port_chan_tx.send(error).unwrap();
                             callback();
                         }
                     }
@@ -194,7 +203,9 @@ impl SerialThread {
                                 Err(e) => error!("{:?}", e),
                             }
                         } else {
-                            from_port_chan_tx.send(SerialResponse::LogToFileError(String::from("No open port to log file from!"))).unwrap();
+                            let err_str = String::from("No open port to log file from");
+                            let error = SerialResponse::LogToFileError(err_str);
+                            from_port_chan_tx.send(error).unwrap();
                             callback();
                         }
                     }
@@ -299,30 +310,34 @@ impl SerialThread {
                               -> Result<(), GeneralError> {
         let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
+        // TODO: Remove in favor of impl From for GeneralError
         tx.send(SerialCommand::ConnectToPort {
                 name: port_name,
                 baud: baud_rate,
             })
-            .map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+            .map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_close_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_change_baud_cmd(&self, baud_rate: String) -> Result<(), GeneralError> {
         let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_change_data_bits_cmd(&self, data_bits: DataBits) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangeDataBits(data_bits)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeDataBits(data_bits)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
@@ -330,55 +345,64 @@ impl SerialThread {
                                              flow_control: FlowControl)
                                              -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangeFlowControl(flow_control)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeFlowControl(flow_control)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_change_stop_bits_cmd(&self, stop_bits: StopBits) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangeStopBits(stop_bits)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeStopBits(stop_bits)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_change_parity_cmd(&self, parity: Parity) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangeParity(parity)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangeParity(parity)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_change_port_cmd(&self, port_name: String) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_data_cmd(&self, data: Vec<u8>) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_port_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_cancel_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_log_to_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::LogToFile(path)).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::LogToFile(path)).map_err(GeneralError::Send)?;
         Ok(())
     }
 
     pub fn send_cancel_log_to_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
-        tx.send(SerialCommand::CancelLogToFile).map_err(GeneralError::Send)?; // TODO: Remove in favor of impl From for GeneralError
+        // TODO: Remove in favor of impl From for GeneralError
+        tx.send(SerialCommand::CancelLogToFile).map_err(GeneralError::Send)?;
         Ok(())
     }
 }
