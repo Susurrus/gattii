@@ -7,7 +7,7 @@ dependencies = [
  "glib 0.1.1 (git+https://github.com/gtk-rs/glib)",
  "gtk 0.1.1 (git+https://github.com/gtk-rs/gtk)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "serialport 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serialport 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -364,7 +364,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "serialport"
-version = "0.3.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -477,7 +477,7 @@ dependencies = [
 "checksum regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4278c17d0f6d62dfef0ab00028feb45bd7d2102843f80763474eeb1be8a10c01"
 "checksum regex-syntax 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9191b1f57603095f105d317e375d19b1c9c5c3185ea9633a99a6dcbed04457"
 "checksum rustc-serialize 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "237546c689f20bb44980270c73c3b9edd0891c1be49cc1274406134a66d3957b"
-"checksum serialport 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9ad6057123179a3e6f017a7fd72901a08024c93f9ab016d9d0e5a9e73f75dd78"
+"checksum serialport 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f886ca4089fe6a0e21f50b2a9b4efd3f86ff8fea68bd98d3974fc790265484f7"
 "checksum termios 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d5d9cf598a6d7ce700a4e6a9199da127e6819a61e64b68609683cc9a01b5683a"
 "checksum thread-id 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4437c97558c70d129e40629a5b385b3fb1ffac301e63941335e4d354081ec14a"
 "checksum thread_local 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7793b722f0f77ce716e7f1acf416359ca32ff24d04ffbac4269f44a4a83be05d"
