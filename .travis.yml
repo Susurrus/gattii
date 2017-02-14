@@ -1,0 +1,19 @@
+language: rust
+
+os: osx
+
+rust:
+  - nightly
+  - stable
+
+matrix:
+  fast_finish: true
+  allow_failures:
+    - rust: nightly
+
+before_install:
+  - brew update
+  - brew install gtk+3
+
+script:
+  - cargo build --verbose
