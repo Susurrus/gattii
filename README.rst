@@ -47,7 +47,7 @@ Building
 
 1. Install Rust stable using `rustup <https://www.rustup.rs/>`_
 2. Install library requirements:
-    * `gtk (3.20+) <http://gtk-rs.org/docs-src/requirements>`_
+    * `gtk (3.14+) <http://gtk-rs.org/docs-src/requirements>`_
 3. Clone the main repository with ``git clone https://gitlab.com/susurrus/gattii.git``
 4. Run ``cargo build`` within the project directory
 

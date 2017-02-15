@@ -9,6 +9,9 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 ==== Added
 * Button to log received data to a file
 
+==== Changed
+* Reduced GTK+ version requirements to 3.14+
+
 ==== Fixed
 * Canceling the send file dialog now correct re-enables the send file dialog
   button
