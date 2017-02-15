@@ -10,8 +10,9 @@ repository = "https://gitlab.com/susurrus/gattii"
 description = "Cross platform GUI (GTK-based) serial terminal"
 
 [badges]
-gitlab = { repository = "susurrus/gattii" }
 appveyor = { repository = "Susurrus/gattii", service = "gitlab" }
+gitlab = { repository = "susurrus/gattii" }
+travis-ci = { repository = "Susurrus/gattii" }
 
 [dependencies]
 argparse = "0.2"
