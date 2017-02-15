@@ -13,6 +13,7 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 * Canceling the send file dialog now correct re-enables the send file dialog
   button
 * Closing the port while sending a file no longer causes a crash.
+* Sending a file will now complete once all of the file has been sent.
 
 === [0.9.0] - 2017-02-04
 ==== Added
