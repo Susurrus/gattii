@@ -1,6 +1,7 @@
 extern crate serialport;
 
 use core::num;
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -44,6 +45,17 @@ pub enum GeneralError {
     Send(mpsc::SendError<SerialCommand>),
 }
 
+pub enum ReadBytes {
+    /// Number of bytes read from the file, 0 if none but not an error
+    Bytes(usize),
+    /// The end of the file has been reached so no data was read
+    EndOfFile,
+    /// An error was encountered reading from the file
+    FileError,
+    /// No read was actually attempted
+    NoAttempt,
+}
+
 pub struct SerialThread {
     pub from_port_chan_rx: Receiver<SerialResponse>,
     pub to_port_chan_tx: Sender<SerialCommand>,
@@ -68,6 +80,7 @@ impl SerialThread {
         thread::spawn(move || {
             let mut port: Option<Box<SerialPort>> = None;
             let mut read_file: Option<Box<File>> = None;
+            let mut bytes_read = 0u64;
             let mut write_file: Option<Box<File>> = None;
 
             let mut serial_buf: Vec<u8> = vec![0; 1000];
@@ -178,7 +191,9 @@ impl SerialThread {
                     }
                     Ok(SerialCommand::SendFile(f)) => {
                         if port.is_some() {
-                            info!("Sending file {:?}", f);
+                            info!("Sending file {:?} ({} bytes)",
+                                  f,
+                                  fs::metadata(&f).unwrap().len());
                             match File::open(f) {
                                 Ok(file) => read_file = Some(Box::new(file)),
                                 Err(e) => error!("{:?}", e),
@@ -247,52 +262,60 @@ impl SerialThread {
 
                     // If a file has been opened, read the next 1ms of data from
                     // it as determined by the current baud rate.
-                    let mut read_len: Option<usize> = None;
-                    if let Some(ref mut file) = read_file {
-                        let mut byte_as_serial_bits = 1 + 8;
-                        if p.parity().unwrap() != Parity::None {
-                            byte_as_serial_bits += 1;
-                        }
-                        if p.stop_bits().unwrap() == StopBits::One {
-                            byte_as_serial_bits += 1;
-                        } else if p.stop_bits().unwrap() == StopBits::Two {
-                            byte_as_serial_bits += 2;
-                        }
-                        // Write 10ms of data at a time to account for loop time
-                        // variation
-                        let data_packet_time = 10; // ms
-                        if last_send_time.elapsed().subsec_nanos() > data_packet_time * 1_000_000 {
-                            let tx_data_len = p.baud_rate().unwrap().speed() / byte_as_serial_bits /
-                                              (1000 / data_packet_time as usize);
+                    let mut read_len: ReadBytes = ReadBytes::NoAttempt;
+                    let mut byte_as_serial_bits = 1 + 8;
+                    if p.parity().unwrap() != Parity::None {
+                        byte_as_serial_bits += 1;
+                    }
+                    if p.stop_bits().unwrap() == StopBits::One {
+                        byte_as_serial_bits += 1;
+                    } else if p.stop_bits().unwrap() == StopBits::Two {
+                        byte_as_serial_bits += 2;
+                    }
+                    // Write 10ms of data at a time to account for loop time
+                    // variation
+                    let data_packet_time = 10; // ms
+                    if last_send_time.elapsed().subsec_nanos() > data_packet_time * 1_000_000 {
+                        let tx_data_len = p.baud_rate().unwrap().speed() / byte_as_serial_bits /
+                                          (1000 / data_packet_time as usize);
+                        if let Some(ref mut file) = read_file {
                             debug!("Reading {} bytes", tx_data_len);
-                            if let Ok(len) = file.read(&mut serial_buf_rx[..tx_data_len]) {
-                                read_len = Some(len);
-                            } else {
-                                error!("Failed to read {} bytes", tx_data_len);
+                            match file.read(&mut serial_buf_rx[..tx_data_len]) {
+                                Ok(0) => {
+                                    debug!("END OF FILE!");
+                                    read_len = ReadBytes::EndOfFile;
+                                }
+                                Ok(len) => {
+                                    bytes_read += len as u64;
+                                    debug!("Actually read {} bytes ({} total)", len, bytes_read);
+                                    read_len = ReadBytes::Bytes(len);
+                                }
+                                Err(e) => {
+                                    error!("File error trying to read {} bytes", tx_data_len);
+                                    error!("{:?}", e);
+                                    read_len = ReadBytes::FileError;
+                                }
                             }
-                        } else {
-                            read_len = Some(0);
                         }
                     }
 
                     match read_len {
-                        Some(x) => {
-                            if x > 0 {
-                                if p.write(&serial_buf_rx[..x]).is_err() {
-                                    error!("Failed to send {} bytes", x);
-                                    read_file = None;
-                                }
-                                last_send_time = Instant::now();
-                            }
-                        }
-                        None => {
-                            if read_file.is_some() {
+                        ReadBytes::Bytes(x) => {
+                            if p.write(&serial_buf_rx[..x]).is_err() {
+                                error!("Failed to send {} bytes", x);
                                 read_file = None;
                                 from_port_chan_tx.send(SerialResponse::SendingFileComplete)
                                     .unwrap();
                                 callback();
                             }
+                            last_send_time = Instant::now();
                         }
+                        ReadBytes::EndOfFile | ReadBytes::FileError => {
+                            read_file = None;
+                            from_port_chan_tx.send(SerialResponse::SendingFileComplete).unwrap();
+                            callback();
+                        }
+                        ReadBytes::NoAttempt => (),
                     }
                 }
             }

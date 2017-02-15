@@ -698,7 +698,9 @@ fn receive() -> glib::Continue {
                 Ok(SerialResponse::SendingFileComplete) |
                 Ok(SerialResponse::SendingFileCanceled) => {
                     info!("Sending file complete");
+                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
                     f_button.set_active(false);
+                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
                 }
                 Ok(SerialResponse::SendingFileError(_)) => {
