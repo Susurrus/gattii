@@ -570,8 +570,7 @@ fn main() {
             ui.text_view_insert_signal = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
                     if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        let v = Vec::from(text);
-                        match serial_thread.send_port_data_cmd(v) {
+                        match serial_thread.send_port_data_cmd(text.as_bytes()) {
                             Err(GeneralError::Send(_)) => {
                                 error!("Error sending data command to child \
                                           thread. Aborting.")

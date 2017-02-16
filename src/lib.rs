@@ -397,10 +397,10 @@ impl SerialThread {
         Ok(())
     }
 
-    pub fn send_port_data_cmd(&self, data: Vec<u8>) -> Result<(), GeneralError> {
+    pub fn send_port_data_cmd(&self, data: &[u8]) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::SendData(data)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::SendData(data.into())).map_err(GeneralError::Send)?;
         Ok(())
     }
 
