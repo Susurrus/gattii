@@ -69,6 +69,7 @@ struct Ui {
 }
 
 struct State {
+    /// True if a serial port is currently connected
     connected: bool,
 }
 
