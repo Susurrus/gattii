@@ -71,6 +71,8 @@ struct Ui {
 struct State {
     /// True if a serial port is currently connected
     connected: bool,
+    /// The line ending that is sent when ENTER is pressed
+    line_ending: String,
 }
 
 // declare a new thread local storage key
@@ -217,6 +219,17 @@ fn main() {
     flow_control_dropdown.append(None, "Software");
     flow_control_dropdown.set_active(0);
     popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
+    let separator = gtk::SeparatorMenuItem::new();
+    popover_container.attach(&separator, 0, 4, 2, 1);
+    let line_ending_label = gtk::Label::new("Enter sends:");
+    line_ending_label.set_halign(gtk::Align::End);
+    popover_container.attach(&line_ending_label, 0, 5, 1, 1);
+    let line_ending_dropdown = gtk::ComboBoxText::new();
+    line_ending_dropdown.append(None, "\\n");
+    line_ending_dropdown.append(None, "\\r");
+    line_ending_dropdown.append(None, "\\r\\n");
+    line_ending_dropdown.set_active(0);
+    popover_container.attach(&line_ending_dropdown, 1, 5, 1, 1);
     popover_container.show_all();
     port_settings_popover.add(&popover_container);
     let port_settings_button_container = gtk::ToolItem::new();
@@ -297,7 +310,7 @@ fn main() {
         file_button_toggled_signal: 0,
         save_button_toggled_signal: 0,
     };
-    let state = State { connected: false };
+    let state = State { connected: false, line_ending: "\n".to_string() };
     GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((ui,
                                      SerialThread::new(|| {
@@ -342,6 +355,19 @@ fn main() {
                 }
             });
         }
+    });
+
+    line_ending_dropdown.connect_changed(move |s| {
+        GLOBAL.with(|global| {
+            if let Some((_, _, ref mut state)) = *global.borrow_mut() {
+                state.line_ending = match s.get_active_text() {
+                    Some(ref x) if x == "\\n" => "\n".to_string(),
+                    Some(ref x) if x == "\\r" => "\r".to_string(),
+                    Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
+                    Some(_) | None => unreachable!(),
+                };
+            }
+        });
     });
 
     let open_button_clicked_signal =
@@ -603,8 +629,11 @@ fn main() {
             let b = &ui.text_buffer;
             ui.text_view_insert_signal = b.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_data_cmd(text.as_bytes()) {
+                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+                        let text = text.replace("\n", &state.line_ending);
+                        debug!("Sending {:?}", &text);
+                        let text = text.as_bytes();
+                        match serial_thread.send_port_data_cmd(text) {
                             Err(GeneralError::Send(_)) => {
                                 error!("Error sending data command to child \
                                           thread. Aborting.")
