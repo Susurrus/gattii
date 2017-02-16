@@ -105,7 +105,7 @@ impl SerialThread {
                                 from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
                             }
                             Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
-			        let err_str = String::from(format!("Port '{}' is already in use \
+                                let err_str = String::from(format!("Port '{}' is already in use \
                                                                     or doesn't exist", &name));
                                 let error = SerialResponse::OpenPortError(err_str);
                                 from_port_chan_tx.send(error).unwrap();
