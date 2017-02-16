@@ -43,6 +43,7 @@ pub enum SerialResponse {
     LoggingFileCanceled,
 }
 
+#[derive(Debug)]
 pub enum GeneralError {
     Parse(num::ParseIntError),
     Send(mpsc::SendError<SerialCommand>),

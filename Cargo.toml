@@ -19,6 +19,7 @@ argparse = "0.2"
 env_logger = "0.4"
 log = "0.3"
 glib = { git = "https://github.com/gtk-rs/glib" }
+gdk = { git = "https://github.com/gtk-rs/gdk" }
 serialport = "1.0"
 
 [dependencies.gtk]

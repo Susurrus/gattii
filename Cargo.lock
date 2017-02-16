@@ -4,6 +4,7 @@ version = "0.9.0"
 dependencies = [
  "argparse 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gdk 0.5.1 (git+https://github.com/gtk-rs/gdk)",
  "glib 0.1.1 (git+https://github.com/gtk-rs/glib)",
  "gtk 0.1.1 (git+https://github.com/gtk-rs/gtk)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",

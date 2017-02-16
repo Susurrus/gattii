@@ -3,8 +3,9 @@ extern crate core;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate gtk;
+extern crate gdk;
 extern crate glib;
+extern crate gtk;
 
 extern crate gattii;
 
@@ -560,6 +561,38 @@ fn main() {
                     popup.append(&clear_all);
                     popup.show_all();
                 }
+            });
+
+            ui.text_view.connect_key_press_event(|_, k| {
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+                        if state.connected && k.get_state().contains(gdk::CONTROL_MASK) {
+                            if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
+                                let cmd : Option<u8> = match key {
+                                    '@' => Some(0),
+                                    'A'...'Z' => Some(1 + key as u8 - 'A' as u8),
+                                    '[' => Some(27),
+                                    '\\' => Some(28),
+                                    ']' => Some(29),
+                                    '^' => Some(30),
+                                    '_' => Some(31),
+                                    _ => None,
+                                };
+                                if let Some(cmd) = cmd {
+                                    match serial_thread.send_port_data_cmd(&[cmd as u8]) {
+                                        Err(GeneralError::Send(_)) => {
+                                            error!("Error sending data command to child thread. \
+                                                    Aborting.")
+                                        }
+                                        Err(e) => error!("{:?}", e),
+                                        Ok(_) => info!("Sent control code Ctrl-{}", key),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                Inhibit(false)
             });
         }
     });
