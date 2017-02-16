@@ -165,7 +165,7 @@ fn main() {
     let port_settings_popover = gtk::Popover::new(Some(&port_settings_button));
     port_settings_popover.set_position(gtk::PositionType::Bottom);
     // Enable the following once upgrading to GTK+3.20+
-    //port_settings_popover.set_constrain_to(gtk::PopoverConstraint::None);
+    // port_settings_popover.set_constrain_to(gtk::PopoverConstraint::None);
     port_settings_button.set_popover(Some(&port_settings_popover));
     let popover_container = gtk::Grid::new();
     popover_container.set_margin_top(10);
