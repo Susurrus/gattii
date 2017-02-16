@@ -461,7 +461,7 @@ fn main() {
                 }
             });
 
-            // Configure the data bits callback
+            // Configure the flow control dropdown callback
             ui.flow_control_dropdown.connect_changed(|s| {
                 let flow_control = match s.get_active_text() {
                     Some(ref x) if x == "None" => Some(FlowControl::None),
