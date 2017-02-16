@@ -606,13 +606,14 @@ fn main() {
                                     _ => None,
                                 };
                                 if let Some(cmd) = cmd {
+                                    info!("Sending Ctrl-{}", &key);
                                     match serial_thread.send_port_data_cmd(&[cmd as u8]) {
                                         Err(GeneralError::Send(_)) => {
                                             error!("Error sending data command to child thread. \
                                                     Aborting.")
                                         }
                                         Err(e) => error!("{:?}", e),
-                                        Ok(_) => info!("Sent control code Ctrl-{}", key),
+                                        Ok(_) => (),
                                     }
                                 }
                             }
