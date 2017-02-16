@@ -1,5 +1,3 @@
-#![crate_type = "bin"]
-
 extern crate argparse;
 extern crate core;
 extern crate env_logger;
@@ -7,6 +5,8 @@ extern crate env_logger;
 extern crate log;
 extern crate gtk;
 extern crate glib;
+
+extern crate gattii;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -17,8 +17,7 @@ use argparse::{ArgumentParser, Store};
 use gtk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 
-mod serial_thread;
-use serial_thread::*;
+use gattii::*;
 
 // make moving clones into closures more convenient
 // Taken from: https://github.com/gtk-rs/examples/blob/pending/src/cairo_threads.rs#L17
@@ -118,7 +117,7 @@ fn main() {
     // Add a port selector
     let ports_selector = gtk::ComboBoxText::new();
     let mut ports_selector_map = HashMap::new();
-    if let Ok(mut ports) = serial_thread::list_ports() {
+    if let Ok(mut ports) = list_ports() {
         ports.sort();
         if !ports.is_empty() {
             for (i, p) in ports.into_iter().enumerate() {

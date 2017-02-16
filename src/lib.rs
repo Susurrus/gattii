@@ -1,3 +1,6 @@
+extern crate core;
+#[macro_use]
+extern crate log;
 extern crate serialport;
 
 use core::num;
