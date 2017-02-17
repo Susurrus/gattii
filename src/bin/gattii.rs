@@ -390,14 +390,18 @@ fn main() {
             if let Some(port_name) = ports_selector.get_active_text() {
                 if let Some(baud_rate) = baud_selector.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) =>
                                     error!("Invalid baud rate '{}' specified.", &baud_rate),
                                 Err(GeneralError::Send(_)) =>
                                     error!("Error sending port_open command to \
                                               child thread. Aborting."),
-                                Ok(_) => ()
+                                // After opening the port has succeeded, set the focus on the text
+                                // view so the user can start sending data immediately (this also
+                                // prevents ENTER from closing the port, likely not what the user
+                                // intends or expects).
+                                Ok(_) => ui.text_view.grab_focus(),
                             }
                         }
                     });
