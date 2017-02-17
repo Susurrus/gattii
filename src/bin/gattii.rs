@@ -178,7 +178,8 @@ fn main() {
     popover_container.set_margin_left(10);
     popover_container.set_row_spacing(10);
     popover_container.set_column_spacing(10);
-    let data_bits_label = gtk::Label::new("Data bits:");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let data_bits_label = gtk::Label::new(Some("Data bits:"));
     data_bits_label.set_halign(gtk::Align::End);
     popover_container.attach(&data_bits_label, 0, 0, 1, 1);
     let data_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 5.0, 8.0, 1.0);
@@ -186,22 +187,26 @@ fn main() {
     // FIXME: Remove the following line of code once GTK+ bug 358970 is released
     data_bits_scale.set_round_digits(0);
     data_bits_scale.set_value(8.0);
-    data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, "5");
-    data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, "6");
-    data_bits_scale.add_mark(7.0, gtk::PositionType::Bottom, "7");
-    data_bits_scale.add_mark(8.0, gtk::PositionType::Bottom, "8");
+    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
+    data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, Some("5"));
+    data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, Some("6"));
+    data_bits_scale.add_mark(7.0, gtk::PositionType::Bottom, Some("7"));
+    data_bits_scale.add_mark(8.0, gtk::PositionType::Bottom, Some("8"));
     popover_container.attach(&data_bits_scale, 1, 0, 1, 1);
-    let stop_bits_label = gtk::Label::new("Stop bits:");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let stop_bits_label = gtk::Label::new(Some("Stop bits:"));
     stop_bits_label.set_halign(gtk::Align::End);
     popover_container.attach(&stop_bits_label, 0, 1, 1, 1);
     let stop_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
     stop_bits_scale.set_draw_value(false);
     // FIXME: Remove the following line of code once GTK+ bug 358970 is released
     stop_bits_scale.set_round_digits(0);
-    stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, "1");
-    stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, "2");
+    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
+    stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, Some("1"));
+    stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, Some("2"));
     popover_container.attach(&stop_bits_scale, 1, 1, 1, 1);
-    let parity_label = gtk::Label::new("Parity:");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let parity_label = gtk::Label::new(Some("Parity:"));
     parity_label.set_halign(gtk::Align::End);
     popover_container.attach(&parity_label, 0, 2, 1, 1);
     let parity_dropdown = gtk::ComboBoxText::new();
@@ -210,7 +215,8 @@ fn main() {
     parity_dropdown.append(None, "Even");
     parity_dropdown.set_active(0);
     popover_container.attach(&parity_dropdown, 1, 2, 1, 1);
-    let flow_control_label = gtk::Label::new("Flow control:");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let flow_control_label = gtk::Label::new(Some("Flow control:"));
     flow_control_label.set_halign(gtk::Align::End);
     popover_container.attach(&flow_control_label, 0, 3, 1, 1);
     let flow_control_dropdown = gtk::ComboBoxText::new();
@@ -221,7 +227,8 @@ fn main() {
     popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
     let separator = gtk::SeparatorMenuItem::new();
     popover_container.attach(&separator, 0, 4, 2, 1);
-    let line_ending_label = gtk::Label::new("Enter sends:");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let line_ending_label = gtk::Label::new(Some("Enter sends:"));
     line_ending_label.set_halign(gtk::Align::End);
     popover_container.attach(&line_ending_label, 0, 5, 1, 1);
     let line_ending_dropdown = gtk::ComboBoxText::new();
@@ -263,7 +270,8 @@ fn main() {
     separator.set_expand(true);
     toolbar.add(&separator);
     let send_file_button = gtk::ToggleButton::new();
-    send_file_button.set_tooltip_text("Transmit file");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    send_file_button.set_tooltip_text(Some("Transmit file"));
     // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
     // is resolved
     let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
@@ -275,7 +283,8 @@ fn main() {
 
     // Add save file button
     let save_file_button = gtk::ToggleButton::new();
-    save_file_button.set_tooltip_text("Record to file");
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    save_file_button.set_tooltip_text(Some("Record to file"));
     // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
     // is resolved
     let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
