@@ -8,6 +8,8 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 === Unreleased
 ==== Added
 * Button to log received data to a file
+* The line ending to send when hitting ENTER is now selectable
+* Control codes can be sent by hitting CTRL and one of @, A-Z, [, \, ], ^, _
 
 ==== Changed
 * Reduced GTK+ version requirements to 3.14+
