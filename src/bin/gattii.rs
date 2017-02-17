@@ -321,12 +321,15 @@ fn main() {
         file_button_toggled_signal: 0,
         save_button_toggled_signal: 0,
     };
-    let state = State { connected: false, line_ending: "\n".to_string() };
+    let state = State {
+        connected: false,
+        line_ending: "\n".to_string(),
+    };
     GLOBAL.with(move |global| {
         *global.borrow_mut() = Some((ui,
                                      SerialThread::new(|| {
-                                         glib::idle_add(receive);
-                                     }),
+            glib::idle_add(receive);
+        }),
                                      state));
     });
 
@@ -606,7 +609,7 @@ fn main() {
                     if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
                         if state.connected && k.get_state().contains(gdk::CONTROL_MASK) {
                             if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
-                                let cmd : Option<u8> = match key {
+                                let cmd: Option<u8> = match key {
                                     '@' => Some(0),
                                     'A'...'Z' => Some(1 + key as u8 - 'A' as u8),
                                     '[' => Some(27),
