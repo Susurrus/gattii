@@ -257,13 +257,6 @@ fn main() {
     scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scroll.add(&text_view);
 
-    let css_style_provider = gtk::CssProvider::new();
-    let style = "GtkTextView { font: 11pt monospace }";
-    css_style_provider.load_from_data(style).unwrap();
-    let text_view_style_context = text_view.get_style_context().unwrap();
-    text_view_style_context.add_provider(&css_style_provider,
-                                         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-
     // Add send file button
     let separator = gtk::SeparatorToolItem::new();
     separator.set_draw(false);
@@ -299,6 +292,15 @@ fn main() {
     vbox.pack_start(&toolbar, false, false, 0);
     vbox.pack_start(&scroll, true, true, 0);
     window.add(&vbox);
+
+    // Set CSS styles for the entire application.
+    let css_provider = gtk::CssProvider::new();
+    let display = gdk::Display::get_default().expect("Couldn't open default GDK display");
+    let screen = display.get_default_screen();
+    gtk::StyleContext::add_provider_for_screen(&screen,
+                                               &css_provider,
+                                               gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    css_provider.load_from_path("resources/style.css").expect("Failed to load CSS stylesheet");
 
     // Set up channels for communicating with the port thread.
     let buffer = text_view.get_buffer().unwrap();
