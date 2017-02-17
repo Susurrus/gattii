@@ -326,11 +326,8 @@ fn main() {
         line_ending: "\n".to_string(),
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui,
-                                     SerialThread::new(|| {
-            glib::idle_add(receive);
-        }),
-                                     state));
+        *global.borrow_mut() =
+            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
     });
 
     baud_selector.connect_changed(move |s| {
