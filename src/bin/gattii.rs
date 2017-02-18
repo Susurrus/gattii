@@ -608,28 +608,37 @@ fn main() {
             ui.text_view.connect_key_press_event(|_, k| {
                 GLOBAL.with(|global| {
                     if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        if state.connected && k.get_state().contains(gdk::CONTROL_MASK) {
-                            if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
-                                let cmd: Option<u8> = match key {
-                                    '@' => Some(0),
-                                    'A'...'Z' => Some(1 + key as u8 - 'A' as u8),
-                                    '[' => Some(27),
-                                    '\\' => Some(28),
-                                    ']' => Some(29),
-                                    '^' => Some(30),
-                                    '_' => Some(31),
-                                    _ => None,
-                                };
-                                if let Some(cmd) = cmd {
-                                    info!("Sending Ctrl-{}", &key);
-                                    match serial_thread.send_port_data_cmd(&[cmd as u8]) {
-                                        Err(GeneralError::Send(_)) => {
-                                            error!("Error sending data command to child thread. \
-                                                    Aborting.")
-                                        }
-                                        Err(e) => error!("{:?}", e),
-                                        Ok(_) => (),
+                        if state.connected {
+                            let mut cmd: Option<(u8, char)> = None;
+                            // Check for a backspace with no modifier keys
+                            if k.get_state().is_empty() &&
+                               k.get_keyval() == gdk::enums::key::BackSpace {
+                                cmd = Some((8, 'H'));
+                            }
+                            // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
+                            else if k.get_state().contains(gdk::CONTROL_MASK) {
+                                if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
+                                    cmd = match key {
+                                        '@' => Some((0, key)),
+                                        'A'...'Z' => Some((1 + key as u8 - 'A' as u8, key)),
+                                        '[' => Some((27, key)),
+                                        '\\' => Some((28, key)),
+                                        ']' => Some((29, key)),
+                                        '^' => Some((30, key)),
+                                        '_' => Some((31, key)),
+                                        _ => None,
+                                    };
+                                }
+                            }
+                            if let Some((cmd, debug_char)) = cmd {
+                                info!("Sending Ctrl-{}", debug_char);
+                                match serial_thread.send_port_data_cmd(&[cmd as u8]) {
+                                    Err(GeneralError::Send(_)) => {
+                                        error!("Error sending data command to child thread. \
+                                                Aborting.")
                                     }
+                                    Err(e) => error!("{:?}", e),
+                                    Ok(_) => (),
                                 }
                             }
                         }
