@@ -96,351 +96,7 @@ fn main() {
 
     ui_init();
 
-
-    GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            ui.baud_dropdown.connect_changed(move |s| {
-                if let Some(baud_rate) = s.get_active_text() {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => {
-                                    error!("Invalid baud rate '{}' specified.", &baud_rate)
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending port_open command to child thread. \
-                                            Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        }
-                    });
-                }
-            });
-
-            ui.ports_dropdown.connect_changed(move |s| {
-                if let Some(port_name) = s.get_active_text() {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_port_cmd(port_name.clone()) {
-                                Err(GeneralError::Parse(_)) => {
-                                    error!("Invalid port name '{}' specified.", &port_name)
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending change_port command to child thread. \
-                                            Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        }
-                    });
-                }
-            });
-
-            ui.line_ending_dropdown.connect_changed(move |s| {
-                GLOBAL.with(|global| {
-                    if let Some((_, _, ref mut state)) = *global.borrow_mut() {
-                        state.line_ending = match s.get_active_text() {
-                            Some(ref x) if x == "\\n" => "\n".to_string(),
-                            Some(ref x) if x == "\\r" => "\r".to_string(),
-                            Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
-                            Some(_) | None => unreachable!(),
-                        };
-                    }
-                });
-            });
-
-            let open_button_clicked_signal = ui.open_button.connect_clicked(move |s| {
-                if s.get_active() {
-                    GLOBAL.with(|global| {
-                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
-                            if let Some(port_name) = ui.ports_dropdown.get_active_text() {
-                                if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
-                                    match serial_thread.send_port_open_cmd(port_name,
-                                                                           baud_rate.clone()) {
-                                        Err(GeneralError::Parse(_)) =>
-                                            error!("Invalid baud rate '{}' specified.", &baud_rate),
-                                        Err(GeneralError::Send(_)) =>
-                                            error!("Error sending port_open command to child \
-                                                    thread. Aborting."),
-                                        // After opening the port has succeeded, set the focus on
-                                        // the text view so the user can start sending data
-                                        // immediately (this also prevents ENTER from closing the
-                                        // port, likely not what the user intends or expects).
-                                        Ok(_) => ui.text_view.grab_focus(),
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_close_cmd() {
-                                Err(GeneralError::Send(_)) => error!("Error sending port_close \
-                                                                      command to child thread. \
-                                                                      Aborting."),
-                                Err(_) | Ok(_) => ()
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Connect send file selector button to callback. This is left as a
-            // separate function to reduce rightward drift.
-            ui.file_button_toggled_signal = ui.file_button
-                .connect_toggled(file_button_connect_toggled);
-
-            // Connect log file selector button to callback. This is left as a
-            // separate function to reduce rightward drift.
-            ui.save_button_toggled_signal = ui.save_button
-                .connect_toggled(save_button_connect_toggled);
-
-            // Configure the data bits callback
-            ui.data_bits_scale.connect_value_changed(|s| {
-                let data_bits = match s.get_value() {
-                    5.0 => DataBits::Five,
-                    6.0 => DataBits::Six,
-                    7.0 => DataBits::Seven,
-                    8.0 => DataBits::Eight,
-                    _ => unreachable!(),
-                };
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_data_bits_cmd(data_bits) {
-                            Err(GeneralError::Parse(_)) => {
-                                unreachable!();
-                            }
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending data bits change command \
-                                          to child thread. Aborting.")
-                            }
-                            Ok(_) => (),
-                        }
-                    }
-                });
-            });
-
-            // Configure the data bits callback
-            ui.stop_bits_scale.connect_value_changed(|s| {
-                let stop_bits = match s.get_value() {
-                    1.0 => StopBits::One,
-                    2.0 => StopBits::Two,
-                    _ => unreachable!(),
-                };
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
-                            Err(GeneralError::Parse(_)) => {
-                                unreachable!();
-                            }
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending stop bits change command \
-                                          to child thread. Aborting.")
-                            }
-                            Ok(_) => (),
-                        }
-                    }
-                });
-            });
-
-            // Configure the parity dropdown callback
-            ui.parity_dropdown.connect_changed(|s| {
-                let parity = match s.get_active_text() {
-                    Some(ref x) if x == "None" => Some(Parity::None),
-                    Some(ref x) if x == "Odd" => Some(Parity::Odd),
-                    Some(ref x) if x == "Even" => Some(Parity::Even),
-                    Some(_) | None => unreachable!(),
-                };
-                if let Some(parity) = parity {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_parity_cmd(parity) {
-                                Err(GeneralError::Parse(_)) => {
-                                    unreachable!();
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending parity change command \
-                                              to child thread. Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Configure the flow control dropdown callback
-            ui.flow_control_dropdown.connect_changed(|s| {
-                let flow_control = match s.get_active_text() {
-                    Some(ref x) if x == "None" => Some(FlowControl::None),
-                    Some(ref x) if x == "Software" => Some(FlowControl::Software),
-                    Some(ref x) if x == "Hardware" => Some(FlowControl::Hardware),
-                    Some(_) | None => unreachable!(),
-                };
-                if let Some(flow_control) = flow_control {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_flow_control_cmd(flow_control) {
-                                Err(GeneralError::Parse(_)) => {
-                                    unreachable!();
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending flow control change \
-                                              command to child thread. Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Configure the right-click menu for the text view widget
-            ui.text_view.connect_populate_popup(|t, p| {
-                if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
-
-                    // Remove the "delete" menu option as it doesn't even work
-                    // because the "delete-range" signal is disabled.
-                    for c in popup.get_children() {
-                        // Workaround for Bug 778162:
-                        // https://bugzilla.gnome.org/show_bug.cgi?id=778162
-                        if c.is::<gtk::SeparatorMenuItem>() {
-                            continue;
-                        }
-                        if let Ok(child) = c.clone().downcast::<gtk::MenuItem>() {
-                            if let Some(l) = child.get_label() {
-                                if l == "_Delete" {
-                                    popup.remove(&c);
-                                }
-                            }
-                        }
-                    }
-
-                    // Only enable the Paste option if a port is open
-                    GLOBAL.with(|global| {
-                        if let Some((_, _, ref state)) = *global.borrow() {
-                            if !state.connected {
-                                for c in popup.get_children() {
-                                    // Workaround for Bug 778162:
-                                    // https://bugzilla.gnome.org/show_bug.cgi?id=778162
-                                    if c.is::<gtk::SeparatorMenuItem>() {
-                                        continue;
-                                    }
-                                    if let Ok(child) = c.downcast::<gtk::MenuItem>() {
-                                        if let Some(l) = child.get_label() {
-                                            if l == "_Paste" {
-                                                child.set_sensitive(false);
-                                            }
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    });
-
-                    // Add a "Clear All" button that's only active if there's
-                    // data in the buffer.
-                    let clear_all = gtk::MenuItem::new_with_label("Clear All");
-                    if let Some(b) = t.get_buffer() {
-                        if b.get_char_count() == 0 {
-                            clear_all.set_sensitive(false);
-                        } else {
-                            clear_all.connect_activate(|_| {
-                                GLOBAL.with(|global| {
-                                    if let Some((ref ui, _, _)) = *global.borrow() {
-                                        // In order to clear the buffer we need to
-                                        // disable the insert-text and delete-range
-                                        // signal handlers.
-                                        signal_handler_block(&ui.text_buffer,
-                                                             ui.text_view_insert_signal);
-                                        signal_handler_block(&ui.text_buffer,
-                                                             ui.text_buffer_delete_signal);
-                                        ui.text_buffer.set_text("");
-                                        signal_handler_unblock(&ui.text_buffer,
-                                                               ui.text_buffer_delete_signal);
-                                        signal_handler_unblock(&ui.text_buffer,
-                                                               ui.text_view_insert_signal);
-                                    }
-                                });
-                            });
-                        }
-                    }
-                    popup.append(&clear_all);
-                    popup.show_all();
-                }
-            });
-
-            ui.text_view.connect_key_press_event(|_, k| {
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        if state.connected {
-                            let mut cmd: Option<(u8, char)> = None;
-                            // Check for a backspace with no modifier keys
-                            if k.get_state().is_empty() &&
-                               k.get_keyval() == gdk::enums::key::BackSpace {
-                                cmd = Some((8, 'h'));
-                            }
-                            // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
-                            else if k.get_state().contains(gdk::CONTROL_MASK) {
-                                if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
-                                    cmd = match key {
-                                        '@' => Some((0, key)),
-                                        'a'...'z' => Some((1 + key as u8 - 'a' as u8, key)),
-                                        '[' => Some((27, key)),
-                                        '\\' => Some((28, key)),
-                                        ']' => Some((29, key)),
-                                        '^' => Some((30, key)),
-                                        '_' => Some((31, key)),
-                                        _ => None,
-                                    };
-                                }
-                            }
-                            if let Some((cmd, debug_char)) = cmd {
-                                info!("Sending Ctrl-{}", debug_char);
-                                match serial_thread.send_port_data_cmd(&[cmd as u8]) {
-                                    Err(GeneralError::Send(_)) => {
-                                        error!("Error sending data command to child thread. \
-                                                Aborting.")
-                                    }
-                                    Err(e) => error!("{:?}", e),
-                                    Ok(_) => (),
-                                }
-                                Inhibit(true);
-                            }
-                        }
-                    }
-                });
-                Inhibit(false)
-            });
-
-            ui.text_view_insert_signal = ui.text_buffer.connect_insert_text(|b, _, text| {
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        let text = text.replace("\n", &state.line_ending);
-                        debug!("Sending {:?}", &text);
-                        let text = text.as_bytes();
-                        match serial_thread.send_port_data_cmd(text) {
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending data command to child \
-                                          thread. Aborting.")
-                            }
-                            Err(_) | Ok(_) => (),
-                        }
-                    }
-                });
-                signal_stop_emission_by_name(b, "insert-text");
-            });
-            ui.open_button_clicked_signal = open_button_clicked_signal;
-
-            // Disable deletion of characters within the textview
-            ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
-                signal_stop_emission_by_name(b, "delete-range");
-            });
-        }
-    });
+    ui_connect();
 
 
     GLOBAL.with(|global| {
@@ -710,6 +366,352 @@ fn ui_init() {
     GLOBAL.with(move |global| {
         *global.borrow_mut() =
             Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+    });
+}
+
+fn ui_connect() {
+
+    GLOBAL.with(|global| {
+        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
+            ui.baud_dropdown.connect_changed(move |s| {
+                if let Some(baud_rate) = s.get_active_text() {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                                Err(GeneralError::Parse(_)) => {
+                                    error!("Invalid baud rate '{}' specified.", &baud_rate)
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending port_open command to child thread. \
+                                            Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
+
+            ui.ports_dropdown.connect_changed(move |s| {
+                if let Some(port_name) = s.get_active_text() {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_port_cmd(port_name.clone()) {
+                                Err(GeneralError::Parse(_)) => {
+                                    error!("Invalid port name '{}' specified.", &port_name)
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending change_port command to child thread. \
+                                            Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
+
+            ui.line_ending_dropdown.connect_changed(move |s| {
+                GLOBAL.with(|global| {
+                    if let Some((_, _, ref mut state)) = *global.borrow_mut() {
+                        state.line_ending = match s.get_active_text() {
+                            Some(ref x) if x == "\\n" => "\n".to_string(),
+                            Some(ref x) if x == "\\r" => "\r".to_string(),
+                            Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
+                            Some(_) | None => unreachable!(),
+                        };
+                    }
+                });
+            });
+
+            ui.open_button_clicked_signal = ui.open_button.connect_clicked(move |s| {
+                if s.get_active() {
+                    GLOBAL.with(|global| {
+                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
+                            if let Some(port_name) = ui.ports_dropdown.get_active_text() {
+                                if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
+                                    match serial_thread.send_port_open_cmd(port_name,
+                                                                           baud_rate.clone()) {
+                                        Err(GeneralError::Parse(_)) =>
+                                            error!("Invalid baud rate '{}' specified.", &baud_rate),
+                                        Err(GeneralError::Send(_)) =>
+                                            error!("Error sending port_open command to child \
+                                                    thread. Aborting."),
+                                        // After opening the port has succeeded, set the focus on
+                                        // the text view so the user can start sending data
+                                        // immediately (this also prevents ENTER from closing the
+                                        // port, likely not what the user intends or expects).
+                                        Ok(_) => ui.text_view.grab_focus(),
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_close_cmd() {
+                                Err(GeneralError::Send(_)) => error!("Error sending port_close \
+                                                                      command to child thread. \
+                                                                      Aborting."),
+                                Err(_) | Ok(_) => ()
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Connect send file selector button to callback. This is left as a
+            // separate function to reduce rightward drift.
+            ui.file_button_toggled_signal = ui.file_button
+                .connect_toggled(file_button_connect_toggled);
+
+            // Connect log file selector button to callback. This is left as a
+            // separate function to reduce rightward drift.
+            ui.save_button_toggled_signal = ui.save_button
+                .connect_toggled(save_button_connect_toggled);
+
+            // Configure the data bits callback
+            ui.data_bits_scale.connect_value_changed(|s| {
+                let data_bits = match s.get_value() {
+                    5.0 => DataBits::Five,
+                    6.0 => DataBits::Six,
+                    7.0 => DataBits::Seven,
+                    8.0 => DataBits::Eight,
+                    _ => unreachable!(),
+                };
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                        match serial_thread.send_port_change_data_bits_cmd(data_bits) {
+                            Err(GeneralError::Parse(_)) => {
+                                unreachable!();
+                            }
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending data bits change command \
+                                          to child thread. Aborting.")
+                            }
+                            Ok(_) => (),
+                        }
+                    }
+                });
+            });
+
+            // Configure the data bits callback
+            ui.stop_bits_scale.connect_value_changed(|s| {
+                let stop_bits = match s.get_value() {
+                    1.0 => StopBits::One,
+                    2.0 => StopBits::Two,
+                    _ => unreachable!(),
+                };
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                        match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
+                            Err(GeneralError::Parse(_)) => {
+                                unreachable!();
+                            }
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending stop bits change command \
+                                          to child thread. Aborting.")
+                            }
+                            Ok(_) => (),
+                        }
+                    }
+                });
+            });
+
+            // Configure the parity dropdown callback
+            ui.parity_dropdown.connect_changed(|s| {
+                let parity = match s.get_active_text() {
+                    Some(ref x) if x == "None" => Some(Parity::None),
+                    Some(ref x) if x == "Odd" => Some(Parity::Odd),
+                    Some(ref x) if x == "Even" => Some(Parity::Even),
+                    Some(_) | None => unreachable!(),
+                };
+                if let Some(parity) = parity {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_parity_cmd(parity) {
+                                Err(GeneralError::Parse(_)) => {
+                                    unreachable!();
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending parity change command \
+                                              to child thread. Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Configure the flow control dropdown callback
+            ui.flow_control_dropdown.connect_changed(|s| {
+                let flow_control = match s.get_active_text() {
+                    Some(ref x) if x == "None" => Some(FlowControl::None),
+                    Some(ref x) if x == "Software" => Some(FlowControl::Software),
+                    Some(ref x) if x == "Hardware" => Some(FlowControl::Hardware),
+                    Some(_) | None => unreachable!(),
+                };
+                if let Some(flow_control) = flow_control {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_flow_control_cmd(flow_control) {
+                                Err(GeneralError::Parse(_)) => {
+                                    unreachable!();
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending flow control change \
+                                              command to child thread. Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Configure the right-click menu for the text view widget
+            ui.text_view.connect_populate_popup(|t, p| {
+                if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
+
+                    // Remove the "delete" menu option as it doesn't even work
+                    // because the "delete-range" signal is disabled.
+                    for c in popup.get_children() {
+                        // Workaround for Bug 778162:
+                        // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+                        if c.is::<gtk::SeparatorMenuItem>() {
+                            continue;
+                        }
+                        if let Ok(child) = c.clone().downcast::<gtk::MenuItem>() {
+                            if let Some(l) = child.get_label() {
+                                if l == "_Delete" {
+                                    popup.remove(&c);
+                                }
+                            }
+                        }
+                    }
+
+                    // Only enable the Paste option if a port is open
+                    GLOBAL.with(|global| {
+                        if let Some((_, _, ref state)) = *global.borrow() {
+                            if !state.connected {
+                                for c in popup.get_children() {
+                                    // Workaround for Bug 778162:
+                                    // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+                                    if c.is::<gtk::SeparatorMenuItem>() {
+                                        continue;
+                                    }
+                                    if let Ok(child) = c.downcast::<gtk::MenuItem>() {
+                                        if let Some(l) = child.get_label() {
+                                            if l == "_Paste" {
+                                                child.set_sensitive(false);
+                                            }
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+                    });
+
+                    // Add a "Clear All" button that's only active if there's
+                    // data in the buffer.
+                    let clear_all = gtk::MenuItem::new_with_label("Clear All");
+                    if let Some(b) = t.get_buffer() {
+                        if b.get_char_count() == 0 {
+                            clear_all.set_sensitive(false);
+                        } else {
+                            clear_all.connect_activate(|_| {
+                                GLOBAL.with(|global| {
+                                    if let Some((ref ui, _, _)) = *global.borrow() {
+                                        // In order to clear the buffer we need to
+                                        // disable the insert-text and delete-range
+                                        // signal handlers.
+                                        signal_handler_block(&ui.text_buffer,
+                                                             ui.text_view_insert_signal);
+                                        signal_handler_block(&ui.text_buffer,
+                                                             ui.text_buffer_delete_signal);
+                                        ui.text_buffer.set_text("");
+                                        signal_handler_unblock(&ui.text_buffer,
+                                                               ui.text_buffer_delete_signal);
+                                        signal_handler_unblock(&ui.text_buffer,
+                                                               ui.text_view_insert_signal);
+                                    }
+                                });
+                            });
+                        }
+                    }
+                    popup.append(&clear_all);
+                    popup.show_all();
+                }
+            });
+
+            ui.text_view.connect_key_press_event(|_, k| {
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+                        if state.connected {
+                            let mut cmd: Option<(u8, char)> = None;
+                            // Check for a backspace with no modifier keys
+                            if k.get_state().is_empty() &&
+                               k.get_keyval() == gdk::enums::key::BackSpace {
+                                cmd = Some((8, 'H'));
+                            }
+                            // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
+                            else if k.get_state().contains(gdk::CONTROL_MASK) {
+                                if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
+                                    cmd = match key {
+                                        '@' => Some((0, key)),
+                                        'A'...'Z' => Some((1 + key as u8 - 'a' as u8, key)),
+                                        '[' => Some((27, key)),
+                                        '\\' => Some((28, key)),
+                                        ']' => Some((29, key)),
+                                        '^' => Some((30, key)),
+                                        '_' => Some((31, key)),
+                                        _ => None,
+                                    };
+                                }
+                            }
+                            if let Some((cmd, debug_char)) = cmd {
+                                info!("Sending Ctrl-{}", debug_char);
+                                match serial_thread.send_port_data_cmd(&[cmd as u8]) {
+                                    Err(GeneralError::Send(_)) => {
+                                        error!("Error sending data command to child thread. \
+                                                Aborting.")
+                                    }
+                                    Err(e) => error!("{:?}", e),
+                                    Ok(_) => (),
+                                }
+                            }
+                        }
+                    }
+                });
+                Inhibit(false)
+            });
+
+            ui.text_view_insert_signal = ui.text_buffer.connect_insert_text(|b, _, text| {
+                GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+                        let text = text.replace("\n", &state.line_ending);
+                        debug!("Sending {:?}", &text);
+                        let text = text.as_bytes();
+                        match serial_thread.send_port_data_cmd(text) {
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending data command to child \
+                                          thread. Aborting.")
+                            }
+                            Err(_) | Ok(_) => (),
+                        }
+                    }
+                });
+                signal_stop_emission_by_name(b, "insert-text");
+            });
+
+            // Disable deletion of characters within the textview
+            ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
+                signal_stop_emission_by_name(b, "delete-range");
+            });
+        }
     });
 }
 
