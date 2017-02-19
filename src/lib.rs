@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub use self::serialport::prelude::*;
 
@@ -91,6 +91,8 @@ impl SerialThread {
             let mut serial_buf_rx = [0; 1000];
             let mut last_send_time = Instant::now();
             let mut settings: SerialPortSettings = Default::default();
+
+            let loop_time = 10usize; // ms
 
             loop {
                 // First check if we have any incoming commands
@@ -278,10 +280,9 @@ impl SerialThread {
                     }
                     // Write 10ms of data at a time to account for loop time
                     // variation
-                    let data_packet_time = 10; // ms
-                    if last_send_time.elapsed().subsec_nanos() > data_packet_time * 1_000_000 {
+                    if last_send_time.elapsed().subsec_nanos() > loop_time as u32 * 1_000_000 {
                         let tx_data_len = p.baud_rate().unwrap().speed() / byte_as_serial_bits /
-                                          (1000 / data_packet_time as usize);
+                                          (1000 / loop_time);
                         if let Some(ref mut file) = read_file {
                             debug!("Reading {} bytes", tx_data_len);
                             match file.read(&mut serial_buf_rx[..tx_data_len]) {
@@ -322,6 +323,8 @@ impl SerialThread {
                         ReadBytes::NoAttempt => (),
                     }
                 }
+
+                thread::sleep(Duration::from_millis(loop_time as u64));
             }
         });
 
