@@ -20,25 +20,6 @@ use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_un
 
 use gattii::*;
 
-// make moving clones into closures more convenient
-// Taken from: https://github.com/gtk-rs/examples/blob/pending/src/cairo_threads.rs#L17
-macro_rules! clone {
-    (@param _) => ( _ );
-    (@param $x:ident) => ( $x );
-    ($($n:ident),+ => move || $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move || $body
-        }
-    );
-    ($($n:ident),+ => move |$($p:tt),+| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move |$(clone!(@param $p),)+| $body
-        }
-    );
-}
-
 #[derive(Debug)]
 enum ExitCode {
     ArgumentError = 1,
@@ -61,6 +42,11 @@ struct Ui {
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
     flow_control_dropdown: gtk::ComboBoxText,
+    baud_dropdown: gtk::ComboBoxText,
+    baud_map: HashMap<String, i32>,
+    ports_dropdown: gtk::ComboBoxText,
+    ports_map: HashMap<String, i32>,
+    line_ending_dropdown: gtk::ComboBoxText,
     text_view_insert_signal: u64,
     text_buffer_delete_signal: u64,
     open_button_clicked_signal: u64,
@@ -108,317 +94,99 @@ fn main() {
         return;
     }
 
-    // Create the main window
-    let window = gtk::Window::new(gtk::WindowType::Toplevel);
-    window.set_title("Gattii - Your Serial Terminal Interface");
-    window.set_position(gtk::WindowPosition::Center);
-    window.set_default_size(400, 300);
+    ui_init();
 
-    // Create the top toolbar
-    let toolbar = gtk::Toolbar::new();
-    toolbar.set_show_arrow(false);
 
-    // Add a port selector
-    let ports_selector = gtk::ComboBoxText::new();
-    let mut ports_selector_map = HashMap::new();
-    if let Ok(mut ports) = list_ports() {
-        ports.sort();
-        if !ports.is_empty() {
-            for (i, p) in ports.into_iter().enumerate() {
-                ports_selector.append(None, &p);
-                ports_selector_map.insert(p, i);
-            }
-            ports_selector.set_active(0);
-        } else {
-            ports_selector.append(None, "No ports found");
-            ports_selector.set_active(0);
-            ports_selector.set_sensitive(false);
-        }
-    } else {
-        ports_selector.append(None, "No ports found");
-        ports_selector.set_active(0);
-        ports_selector.set_sensitive(false);
-    }
-    let ports_selector_container = gtk::ToolItem::new();
-    ports_selector_container.add(&ports_selector);
-
-    // Add a baud rate selector
-    let mut baud_selector_map = HashMap::new();
-    baud_selector_map.insert("921600".to_string(), 0i32);
-    baud_selector_map.insert("115200".to_string(), 1i32);
-    baud_selector_map.insert("57600".to_string(), 2i32);
-    baud_selector_map.insert("38400".to_string(), 3i32);
-    baud_selector_map.insert("19200".to_string(), 4i32);
-    baud_selector_map.insert("9600".to_string(), 5i32);
-    toolbar.add(&ports_selector_container);
-    let baud_selector = gtk::ComboBoxText::new();
-    baud_selector.append(None, "921600");
-    baud_selector.append(None, "115200");
-    baud_selector.append(None, "57600");
-    baud_selector.append(None, "38400");
-    baud_selector.append(None, "19200");
-    baud_selector.append(None, "9600");
-    baud_selector.set_active(5);
-    let baud_selector_container = gtk::ToolItem::new();
-    baud_selector_container.add(&baud_selector);
-    toolbar.add(&baud_selector_container);
-
-    // Add the port settings button
-    let port_settings_button = gtk::MenuButton::new();
-    port_settings_button.set_direction(gtk::ArrowType::None);
-    let port_settings_popover = gtk::Popover::new(Some(&port_settings_button));
-    port_settings_popover.set_position(gtk::PositionType::Bottom);
-    // Enable the following once upgrading to GTK+3.20+
-    // port_settings_popover.set_constrain_to(gtk::PopoverConstraint::None);
-    port_settings_button.set_popover(Some(&port_settings_popover));
-    let popover_container = gtk::Grid::new();
-    popover_container.set_margin_top(10);
-    popover_container.set_margin_right(10);
-    popover_container.set_margin_bottom(10);
-    popover_container.set_margin_left(10);
-    popover_container.set_row_spacing(10);
-    popover_container.set_column_spacing(10);
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    let data_bits_label = gtk::Label::new(Some("Data bits:"));
-    data_bits_label.set_halign(gtk::Align::End);
-    popover_container.attach(&data_bits_label, 0, 0, 1, 1);
-    let data_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 5.0, 8.0, 1.0);
-    data_bits_scale.set_draw_value(false);
-    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
-    data_bits_scale.set_round_digits(0);
-    data_bits_scale.set_value(8.0);
-    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
-    data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, Some("5"));
-    data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, Some("6"));
-    data_bits_scale.add_mark(7.0, gtk::PositionType::Bottom, Some("7"));
-    data_bits_scale.add_mark(8.0, gtk::PositionType::Bottom, Some("8"));
-    popover_container.attach(&data_bits_scale, 1, 0, 1, 1);
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    let stop_bits_label = gtk::Label::new(Some("Stop bits:"));
-    stop_bits_label.set_halign(gtk::Align::End);
-    popover_container.attach(&stop_bits_label, 0, 1, 1, 1);
-    let stop_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
-    stop_bits_scale.set_draw_value(false);
-    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
-    stop_bits_scale.set_round_digits(0);
-    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
-    stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, Some("1"));
-    stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, Some("2"));
-    popover_container.attach(&stop_bits_scale, 1, 1, 1, 1);
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    let parity_label = gtk::Label::new(Some("Parity:"));
-    parity_label.set_halign(gtk::Align::End);
-    popover_container.attach(&parity_label, 0, 2, 1, 1);
-    let parity_dropdown = gtk::ComboBoxText::new();
-    parity_dropdown.append(None, "None");
-    parity_dropdown.append(None, "Odd");
-    parity_dropdown.append(None, "Even");
-    parity_dropdown.set_active(0);
-    popover_container.attach(&parity_dropdown, 1, 2, 1, 1);
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    let flow_control_label = gtk::Label::new(Some("Flow control:"));
-    flow_control_label.set_halign(gtk::Align::End);
-    popover_container.attach(&flow_control_label, 0, 3, 1, 1);
-    let flow_control_dropdown = gtk::ComboBoxText::new();
-    flow_control_dropdown.append(None, "None");
-    flow_control_dropdown.append(None, "Hardware");
-    flow_control_dropdown.append(None, "Software");
-    flow_control_dropdown.set_active(0);
-    popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
-    let separator = gtk::SeparatorMenuItem::new();
-    popover_container.attach(&separator, 0, 4, 2, 1);
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    let line_ending_label = gtk::Label::new(Some("Enter sends:"));
-    line_ending_label.set_halign(gtk::Align::End);
-    popover_container.attach(&line_ending_label, 0, 5, 1, 1);
-    let line_ending_dropdown = gtk::ComboBoxText::new();
-    line_ending_dropdown.append(None, "\\n");
-    line_ending_dropdown.append(None, "\\r");
-    line_ending_dropdown.append(None, "\\r\\n");
-    line_ending_dropdown.set_active(0);
-    popover_container.attach(&line_ending_dropdown, 1, 5, 1, 1);
-    popover_container.show_all();
-    port_settings_popover.add(&popover_container);
-    let port_settings_button_container = gtk::ToolItem::new();
-    port_settings_button_container.add(&port_settings_button);
-    toolbar.add(&port_settings_button_container);
-
-    // Add the open button
-    let open_button_container = gtk::ToolItem::new();
-    let open_button = gtk::ToggleButton::new_with_label("Open");
-    open_button_container.add(&open_button);
-    toolbar.add(&open_button_container);
-
-    // Set up an auto-scrolling text view
-    let text_view = gtk::TextView::new();
-    text_view.set_wrap_mode(gtk::WrapMode::Char);
-    text_view.set_cursor_visible(false);
-    let scroll = gtk::ScrolledWindow::new(None, None);
-    scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
-    scroll.add(&text_view);
-
-    // Add send file button
-    let separator = gtk::SeparatorToolItem::new();
-    separator.set_draw(false);
-    separator.set_expand(true);
-    toolbar.add(&separator);
-    let send_file_button = gtk::ToggleButton::new();
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    send_file_button.set_tooltip_text(Some("Transmit file"));
-    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
-    // is resolved
-    let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
-    send_file_button.set_image(&send_file_image);
-    send_file_button.set_sensitive(false);
-    let send_file_button_container = gtk::ToolItem::new();
-    send_file_button_container.add(&send_file_button);
-    toolbar.add(&send_file_button_container);
-
-    // Add save file button
-    let save_file_button = gtk::ToggleButton::new();
-    // TODO: Remove `Some` from following line once gtk > 1.1 is released
-    save_file_button.set_tooltip_text(Some("Record to file"));
-    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
-    // is resolved
-    let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
-    save_file_button.set_image(&save_file_image);
-    save_file_button.set_sensitive(false);
-    let save_file_button_container = gtk::ToolItem::new();
-    save_file_button_container.add(&save_file_button);
-    toolbar.add(&save_file_button_container);
-
-    // Pack everything vertically
-    let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    vbox.pack_start(&toolbar, false, false, 0);
-    vbox.pack_start(&scroll, true, true, 0);
-    window.add(&vbox);
-
-    // Set CSS styles for the entire application.
-    let css_provider = gtk::CssProvider::new();
-    let display = gdk::Display::get_default().expect("Couldn't open default GDK display");
-    let screen = display.get_default_screen();
-    gtk::StyleContext::add_provider_for_screen(&screen,
-                                               &css_provider,
-                                               gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    css_provider.load_from_path("resources/style.css").expect("Failed to load CSS stylesheet");
-
-    // Set up channels for communicating with the port thread.
-    let buffer = text_view.get_buffer().unwrap();
-    let ui = Ui {
-        window: window.clone(),
-        text_view: text_view.clone(),
-        text_buffer: buffer.clone(),
-        file_button: send_file_button.clone(),
-        open_button: open_button.clone(),
-        save_button: save_file_button.clone(),
-        data_bits_scale: data_bits_scale.clone(),
-        stop_bits_scale: stop_bits_scale.clone(),
-        parity_dropdown: parity_dropdown.clone(),
-        flow_control_dropdown: flow_control_dropdown.clone(),
-        text_view_insert_signal: 0,
-        text_buffer_delete_signal: 0,
-        open_button_clicked_signal: 0,
-        file_button_toggled_signal: 0,
-        save_button_toggled_signal: 0,
-    };
-    let state = State {
-        connected: false,
-        line_ending: "\n".to_string(),
-    };
-    GLOBAL.with(move |global| {
-        *global.borrow_mut() =
-            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
-    });
-
-    baud_selector.connect_changed(move |s| {
-        if let Some(baud_rate) = s.get_active_text() {
-            GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
-                        Err(GeneralError::Parse(_)) => {
-                            error!("Invalid baud rate '{}' specified.", &baud_rate)
-                        }
-                        Err(GeneralError::Send(_)) => {
-                            error!("Error sending port_open command to child \
-                                      thread. Aborting.")
-                        }
-                        Ok(_) => (),
-                    }
-                }
-            });
-        }
-    });
-
-    ports_selector.connect_changed(move |s| {
-        if let Some(port_name) = s.get_active_text() {
-            GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_change_port_cmd(port_name.clone()) {
-                        Err(GeneralError::Parse(_)) => {
-                            error!("Invalid port name '{}' specified.", &port_name)
-                        }
-                        Err(GeneralError::Send(_)) => {
-                            error!("Error sending change_port command to child \
-                                      thread. Aborting.")
-                        }
-                        Ok(_) => (),
-                    }
-                }
-            });
-        }
-    });
-
-    line_ending_dropdown.connect_changed(move |s| {
-        GLOBAL.with(|global| {
-            if let Some((_, _, ref mut state)) = *global.borrow_mut() {
-                state.line_ending = match s.get_active_text() {
-                    Some(ref x) if x == "\\n" => "\n".to_string(),
-                    Some(ref x) if x == "\\r" => "\r".to_string(),
-                    Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
-                    Some(_) | None => unreachable!(),
-                };
-            }
-        });
-    });
-
-    let open_button_clicked_signal =
-        open_button.connect_clicked(clone!(ports_selector, baud_selector => move |s| {
-        if s.get_active() {
-            if let Some(port_name) = ports_selector.get_active_text() {
-                if let Some(baud_rate) = baud_selector.get_active_text() {
+    GLOBAL.with(|global| {
+        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
+            ui.baud_dropdown.connect_changed(move |s| {
+                if let Some(baud_rate) = s.get_active_text() {
                     GLOBAL.with(|global| {
-                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_open_cmd(port_name, baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) =>
-                                    error!("Invalid baud rate '{}' specified.", &baud_rate),
-                                Err(GeneralError::Send(_)) =>
-                                    error!("Error sending port_open command to \
-                                              child thread. Aborting."),
-                                // After opening the port has succeeded, set the focus on the text
-                                // view so the user can start sending data immediately (this also
-                                // prevents ENTER from closing the port, likely not what the user
-                                // intends or expects).
-                                Ok(_) => ui.text_view.grab_focus(),
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                                Err(GeneralError::Parse(_)) => {
+                                    error!("Invalid baud rate '{}' specified.", &baud_rate)
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending port_open command to child thread. \
+                                            Aborting.")
+                                }
+                                Ok(_) => (),
                             }
                         }
                     });
                 }
-            }
-        } else {
-            GLOBAL.with(|global| {
-                if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_close_cmd() {
-                        Err(GeneralError::Send(_)) => error!("Error sending port_close command to \
-                                                              child thread. Aborting."),
-                        Err(_) | Ok(_) => ()
-                    }
+            });
+
+            ui.ports_dropdown.connect_changed(move |s| {
+                if let Some(port_name) = s.get_active_text() {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_change_port_cmd(port_name.clone()) {
+                                Err(GeneralError::Parse(_)) => {
+                                    error!("Invalid port name '{}' specified.", &port_name)
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending change_port command to child thread. \
+                                            Aborting.")
+                                }
+                                Ok(_) => (),
+                            }
+                        }
+                    });
                 }
             });
-        }
-    }));
 
-    GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
+            ui.line_ending_dropdown.connect_changed(move |s| {
+                GLOBAL.with(|global| {
+                    if let Some((_, _, ref mut state)) = *global.borrow_mut() {
+                        state.line_ending = match s.get_active_text() {
+                            Some(ref x) if x == "\\n" => "\n".to_string(),
+                            Some(ref x) if x == "\\r" => "\r".to_string(),
+                            Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
+                            Some(_) | None => unreachable!(),
+                        };
+                    }
+                });
+            });
+
+            let open_button_clicked_signal = ui.open_button.connect_clicked(move |s| {
+                if s.get_active() {
+                    GLOBAL.with(|global| {
+                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
+                            if let Some(port_name) = ui.ports_dropdown.get_active_text() {
+                                if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
+                                    match serial_thread.send_port_open_cmd(port_name,
+                                                                           baud_rate.clone()) {
+                                        Err(GeneralError::Parse(_)) =>
+                                            error!("Invalid baud rate '{}' specified.", &baud_rate),
+                                        Err(GeneralError::Send(_)) =>
+                                            error!("Error sending port_open command to child \
+                                                    thread. Aborting."),
+                                        // After opening the port has succeeded, set the focus on
+                                        // the text view so the user can start sending data
+                                        // immediately (this also prevents ENTER from closing the
+                                        // port, likely not what the user intends or expects).
+                                        Ok(_) => ui.text_view.grab_focus(),
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                            match serial_thread.send_port_close_cmd() {
+                                Err(GeneralError::Send(_)) => error!("Error sending port_close \
+                                                                      command to child thread. \
+                                                                      Aborting."),
+                                Err(_) | Ok(_) => ()
+                            }
+                        }
+                    });
+                }
+            });
+
             // Connect send file selector button to callback. This is left as a
             // separate function to reduce rightward drift.
             ui.file_button_toggled_signal = ui.file_button
@@ -613,14 +381,14 @@ fn main() {
                             // Check for a backspace with no modifier keys
                             if k.get_state().is_empty() &&
                                k.get_keyval() == gdk::enums::key::BackSpace {
-                                cmd = Some((8, 'H'));
+                                cmd = Some((8, 'h'));
                             }
                             // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
                             else if k.get_state().contains(gdk::CONTROL_MASK) {
                                 if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
                                     cmd = match key {
                                         '@' => Some((0, key)),
-                                        'A'...'Z' => Some((1 + key as u8 - 'A' as u8, key)),
+                                        'a'...'z' => Some((1 + key as u8 - 'a' as u8, key)),
                                         '[' => Some((27, key)),
                                         '\\' => Some((28, key)),
                                         ']' => Some((29, key)),
@@ -640,19 +408,15 @@ fn main() {
                                     Err(e) => error!("{:?}", e),
                                     Ok(_) => (),
                                 }
+                                Inhibit(true);
                             }
                         }
                     }
                 });
                 Inhibit(false)
             });
-        }
-    });
 
-    GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            let b = &ui.text_buffer;
-            ui.text_view_insert_signal = b.connect_insert_text(|b, _, text| {
+            ui.text_view_insert_signal = ui.text_buffer.connect_insert_text(|b, _, text| {
                 GLOBAL.with(|global| {
                     if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
                         let text = text.replace("\n", &state.line_ending);
@@ -670,55 +434,283 @@ fn main() {
                 signal_stop_emission_by_name(b, "insert-text");
             });
             ui.open_button_clicked_signal = open_button_clicked_signal;
-        }
-    });
 
-    // Disable deletion of characters within the textview
-    GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            let b = &ui.text_buffer;
-            ui.text_buffer_delete_signal = b.connect_delete_range(move |b, _, _| {
+            // Disable deletion of characters within the textview
+            ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
         }
     });
 
-    // Process any command line arguments that were passed
-    if !serial_port_name.is_empty() && !serial_baud.is_empty() {
-        if let Some(ports_selector_index) = ports_selector_map.get(&serial_port_name) {
-            ports_selector.set_active(*ports_selector_index as i32);
-        } else {
-            error!("Invalid port name '{}' specified.", serial_port_name);
-            process::exit(ExitCode::ArgumentError as i32);
-        }
-        if let Some(baud_selector_index) = baud_selector_map.get(&serial_baud) {
-            baud_selector.set_active(*baud_selector_index);
-        } else {
-            error!("Invalid baud rate '{}' specified.", serial_baud);
-            process::exit(ExitCode::ArgumentError as i32);
-        }
-        open_button.set_active(true);
-    } else if !serial_port_name.is_empty() {
-        error!("A baud rate must be specified.");
-        process::exit(ExitCode::ArgumentError as i32);
-    } else if !serial_baud.is_empty() {
-        error!("A port name must be specified.");
-        process::exit(ExitCode::ArgumentError as i32);
-    }
 
     GLOBAL.with(|global| {
         if let Some((ref ui, _, _)) = *global.borrow() {
-            let window = &ui.window;
-            window.connect_delete_event(|_, _| {
+
+            // Process any command line arguments that were passed
+            if !serial_port_name.is_empty() && !serial_baud.is_empty() {
+                if let Some(ports_dropdown_index) = ui.ports_map.get(&serial_port_name) {
+                    ui.ports_dropdown.set_active(*ports_dropdown_index as i32);
+                } else {
+                    error!("Invalid port name '{}' specified.", serial_port_name);
+                    process::exit(ExitCode::ArgumentError as i32);
+                }
+                if let Some(baud_dropdown_index) = ui.baud_map.get(&serial_baud) {
+                    ui.baud_dropdown.set_active(*baud_dropdown_index);
+                } else {
+                    error!("Invalid baud rate '{}' specified.", serial_baud);
+                    process::exit(ExitCode::ArgumentError as i32);
+                }
+                ui.open_button.set_active(true);
+            } else if !serial_port_name.is_empty() {
+                error!("A baud rate must be specified.");
+                process::exit(ExitCode::ArgumentError as i32);
+            } else if !serial_baud.is_empty() {
+                error!("A port name must be specified.");
+                process::exit(ExitCode::ArgumentError as i32);
+            }
+
+            // Set deleting the window to close the entire application
+            ui.window.connect_delete_event(|_, _| {
                 gtk::main_quit();
                 Inhibit(false)
             });
 
-            window.show_all();
+            // Make sure all widgets are displayed
+            ui.window.show_all();
         }
     });
 
+    // Start our GUI main loop
     gtk::main();
+}
+
+fn ui_init() {
+    // Create the main window
+    let window = gtk::Window::new(gtk::WindowType::Toplevel);
+    window.set_title("Gattii - Your Serial Terminal Interface");
+    window.set_position(gtk::WindowPosition::Center);
+    window.set_default_size(400, 300);
+
+    // Create the top toolbar
+    let toolbar = gtk::Toolbar::new();
+    toolbar.set_show_arrow(false);
+
+    // Add a port selector
+    let ports_dropdown = gtk::ComboBoxText::new();
+    let mut ports_dropdown_map = HashMap::new();
+    if let Ok(mut ports) = list_ports() {
+        ports.sort();
+        if !ports.is_empty() {
+            for (i, p) in (0i32..).zip(ports.into_iter()) {
+                ports_dropdown.append(None, &p);
+                ports_dropdown_map.insert(p, i);
+            }
+            ports_dropdown.set_active(0);
+        } else {
+            ports_dropdown.append(None, "No ports found");
+            ports_dropdown.set_active(0);
+            ports_dropdown.set_sensitive(false);
+        }
+    } else {
+        ports_dropdown.append(None, "No ports found");
+        ports_dropdown.set_active(0);
+        ports_dropdown.set_sensitive(false);
+    }
+    let ports_dropdown_container = gtk::ToolItem::new();
+    ports_dropdown_container.add(&ports_dropdown);
+
+    // Add a baud rate selector
+    let mut baud_dropdown_map = HashMap::new();
+    baud_dropdown_map.insert("921600".to_string(), 0i32);
+    baud_dropdown_map.insert("115200".to_string(), 1i32);
+    baud_dropdown_map.insert("57600".to_string(), 2i32);
+    baud_dropdown_map.insert("38400".to_string(), 3i32);
+    baud_dropdown_map.insert("19200".to_string(), 4i32);
+    baud_dropdown_map.insert("9600".to_string(), 5i32);
+    toolbar.add(&ports_dropdown_container);
+    let baud_dropdown = gtk::ComboBoxText::new();
+    baud_dropdown.append(None, "921600");
+    baud_dropdown.append(None, "115200");
+    baud_dropdown.append(None, "57600");
+    baud_dropdown.append(None, "38400");
+    baud_dropdown.append(None, "19200");
+    baud_dropdown.append(None, "9600");
+    baud_dropdown.set_active(5);
+    let baud_dropdown_container = gtk::ToolItem::new();
+    baud_dropdown_container.add(&baud_dropdown);
+    toolbar.add(&baud_dropdown_container);
+
+    // Add the port settings button
+    let port_settings_button = gtk::MenuButton::new();
+    port_settings_button.set_direction(gtk::ArrowType::None);
+    let port_settings_popover = gtk::Popover::new(Some(&port_settings_button));
+    port_settings_popover.set_position(gtk::PositionType::Bottom);
+    // Enable the following once upgrading to GTK+3.20+
+    // port_settings_popover.set_constrain_to(gtk::PopoverConstraint::None);
+    port_settings_button.set_popover(Some(&port_settings_popover));
+    let popover_container = gtk::Grid::new();
+    popover_container.set_margin_top(10);
+    popover_container.set_margin_right(10);
+    popover_container.set_margin_bottom(10);
+    popover_container.set_margin_left(10);
+    popover_container.set_row_spacing(10);
+    popover_container.set_column_spacing(10);
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let data_bits_label = gtk::Label::new(Some("Data bits:"));
+    data_bits_label.set_halign(gtk::Align::End);
+    popover_container.attach(&data_bits_label, 0, 0, 1, 1);
+    let data_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 5.0, 8.0, 1.0);
+    data_bits_scale.set_draw_value(false);
+    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
+    data_bits_scale.set_round_digits(0);
+    data_bits_scale.set_value(8.0);
+    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
+    data_bits_scale.add_mark(5.0, gtk::PositionType::Bottom, Some("5"));
+    data_bits_scale.add_mark(6.0, gtk::PositionType::Bottom, Some("6"));
+    data_bits_scale.add_mark(7.0, gtk::PositionType::Bottom, Some("7"));
+    data_bits_scale.add_mark(8.0, gtk::PositionType::Bottom, Some("8"));
+    popover_container.attach(&data_bits_scale, 1, 0, 1, 1);
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let stop_bits_label = gtk::Label::new(Some("Stop bits:"));
+    stop_bits_label.set_halign(gtk::Align::End);
+    popover_container.attach(&stop_bits_label, 0, 1, 1, 1);
+    let stop_bits_scale = gtk::Scale::new_with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
+    stop_bits_scale.set_draw_value(false);
+    // FIXME: Remove the following line of code once GTK+ bug 358970 is released
+    stop_bits_scale.set_round_digits(0);
+    // TODO: Remove `Some` from following lines once gtk > 1.1 is released
+    stop_bits_scale.add_mark(1.0, gtk::PositionType::Bottom, Some("1"));
+    stop_bits_scale.add_mark(2.0, gtk::PositionType::Bottom, Some("2"));
+    popover_container.attach(&stop_bits_scale, 1, 1, 1, 1);
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let parity_label = gtk::Label::new(Some("Parity:"));
+    parity_label.set_halign(gtk::Align::End);
+    popover_container.attach(&parity_label, 0, 2, 1, 1);
+    let parity_dropdown = gtk::ComboBoxText::new();
+    parity_dropdown.append(None, "None");
+    parity_dropdown.append(None, "Odd");
+    parity_dropdown.append(None, "Even");
+    parity_dropdown.set_active(0);
+    popover_container.attach(&parity_dropdown, 1, 2, 1, 1);
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let flow_control_label = gtk::Label::new(Some("Flow control:"));
+    flow_control_label.set_halign(gtk::Align::End);
+    popover_container.attach(&flow_control_label, 0, 3, 1, 1);
+    let flow_control_dropdown = gtk::ComboBoxText::new();
+    flow_control_dropdown.append(None, "None");
+    flow_control_dropdown.append(None, "Hardware");
+    flow_control_dropdown.append(None, "Software");
+    flow_control_dropdown.set_active(0);
+    popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
+    let separator = gtk::SeparatorMenuItem::new();
+    popover_container.attach(&separator, 0, 4, 2, 1);
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    let line_ending_label = gtk::Label::new(Some("Enter sends:"));
+    line_ending_label.set_halign(gtk::Align::End);
+    popover_container.attach(&line_ending_label, 0, 5, 1, 1);
+    let line_ending_dropdown = gtk::ComboBoxText::new();
+    line_ending_dropdown.append(None, "\\n");
+    line_ending_dropdown.append(None, "\\r");
+    line_ending_dropdown.append(None, "\\r\\n");
+    line_ending_dropdown.set_active(0);
+    popover_container.attach(&line_ending_dropdown, 1, 5, 1, 1);
+    popover_container.show_all();
+    port_settings_popover.add(&popover_container);
+    let port_settings_button_container = gtk::ToolItem::new();
+    port_settings_button_container.add(&port_settings_button);
+    toolbar.add(&port_settings_button_container);
+
+    // Add the open button
+    let open_button_container = gtk::ToolItem::new();
+    let open_button = gtk::ToggleButton::new_with_label("Open");
+    open_button_container.add(&open_button);
+    toolbar.add(&open_button_container);
+
+    // Set up an auto-scrolling text view
+    let text_view = gtk::TextView::new();
+    text_view.set_wrap_mode(gtk::WrapMode::Char);
+    text_view.set_cursor_visible(false);
+    let scroll = gtk::ScrolledWindow::new(None, None);
+    scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+    scroll.add(&text_view);
+
+    // Add send file button
+    let separator = gtk::SeparatorToolItem::new();
+    separator.set_draw(false);
+    separator.set_expand(true);
+    toolbar.add(&separator);
+    let send_file_button = gtk::ToggleButton::new();
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    send_file_button.set_tooltip_text(Some("Transmit file"));
+    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
+    // is resolved
+    let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    send_file_button.set_image(&send_file_image);
+    send_file_button.set_sensitive(false);
+    let send_file_button_container = gtk::ToolItem::new();
+    send_file_button_container.add(&send_file_button);
+    toolbar.add(&send_file_button_container);
+
+    // Add save file button
+    let save_file_button = gtk::ToggleButton::new();
+    // TODO: Remove `Some` from following line once gtk > 1.1 is released
+    save_file_button.set_tooltip_text(Some("Record to file"));
+    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
+    // is resolved
+    let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    save_file_button.set_image(&save_file_image);
+    save_file_button.set_sensitive(false);
+    let save_file_button_container = gtk::ToolItem::new();
+    save_file_button_container.add(&save_file_button);
+    toolbar.add(&save_file_button_container);
+
+    // Pack everything vertically
+    let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    vbox.pack_start(&toolbar, false, false, 0);
+    vbox.pack_start(&scroll, true, true, 0);
+    window.add(&vbox);
+
+    // Set CSS styles for the entire application.
+    let css_provider = gtk::CssProvider::new();
+    let display = gdk::Display::get_default().expect("Couldn't open default GDK display");
+    let screen = display.get_default_screen();
+    gtk::StyleContext::add_provider_for_screen(&screen,
+                                               &css_provider,
+                                               gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    css_provider.load_from_path("resources/style.css").expect("Failed to load CSS stylesheet");
+
+    // Set up channels for communicating with the port thread.
+    let buffer = text_view.get_buffer().unwrap();
+    let ui = Ui {
+        window: window.clone(),
+        text_view: text_view.clone(),
+        text_buffer: buffer.clone(),
+        file_button: send_file_button.clone(),
+        open_button: open_button.clone(),
+        save_button: save_file_button.clone(),
+        data_bits_scale: data_bits_scale.clone(),
+        stop_bits_scale: stop_bits_scale.clone(),
+        parity_dropdown: parity_dropdown.clone(),
+        flow_control_dropdown: flow_control_dropdown.clone(),
+        baud_dropdown: baud_dropdown.clone(),
+        baud_map: baud_dropdown_map,
+        ports_dropdown: ports_dropdown.clone(),
+        ports_map: ports_dropdown_map,
+        line_ending_dropdown: line_ending_dropdown.clone(),
+        text_view_insert_signal: 0,
+        text_buffer_delete_signal: 0,
+        open_button_clicked_signal: 0,
+        file_button_toggled_signal: 0,
+        save_button_toggled_signal: 0,
+    };
+    let state = State {
+        connected: false,
+        line_ending: "\n".to_string(),
+    };
+    GLOBAL.with(move |global| {
+        *global.borrow_mut() =
+            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+    });
 }
 
 fn receive() -> glib::Continue {
