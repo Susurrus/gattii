@@ -290,6 +290,14 @@ fn ui_init() {
     scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scroll.add(&text_view);
 
+    // Create an "end" text mark within the text buffer that we can use to insert new text. This has
+    // a "false" "gravity" so that inserting text at this mark will keep the mark at the end of it.
+    // This is necessary because the "insert" mark gets moved when users select text.
+    let text_view_buffer = text_view.get_buffer().unwrap();
+    let mark = text_view_buffer.get_insert().unwrap();
+    let iter = text_view_buffer.get_iter_at_mark(&mark);
+    text_view_buffer.create_mark(Some("end"), &iter, false);
+
     // Add send file button
     let separator = gtk::SeparatorToolItem::new();
     separator.set_draw(false);
@@ -336,11 +344,10 @@ fn ui_init() {
     css_provider.load_from_path("resources/style.css").expect("Failed to load CSS stylesheet");
 
     // Set up channels for communicating with the port thread.
-    let buffer = text_view.get_buffer().unwrap();
     let ui = Ui {
         window: window.clone(),
         text_view: text_view.clone(),
-        text_buffer: buffer.clone(),
+        text_buffer: text_view_buffer.clone(),
         file_button: send_file_button.clone(),
         open_button: open_button.clone(),
         save_button: save_file_button.clone(),
@@ -731,8 +738,9 @@ fn receive() -> glib::Continue {
                     // the answer on the gtk+ forums:
                     // http://www.gtkforums.com/viewtopic.php?t=1307
 
-                    // Get the position of the special "insert" mark
-                    let mark = buf.get_insert().unwrap();
+                    // Get the position of our special "end" mark, which will always stay at the end
+                    // of the buffer.
+                    let mark = buf.get_mark("end").unwrap();
                     let mut iter = buf.get_iter_at_mark(&mark);
 
                     // Inserts buffer at the end
@@ -740,7 +748,7 @@ fn receive() -> glib::Continue {
                     buf.insert(&mut iter, &String::from_utf8_lossy(&data));
                     signal_handler_unblock(buf, ui.text_view_insert_signal);
 
-                    // Scroll to the "insert" mark
+                    // Keep the textview scrolled to the bottom
                     view.scroll_mark_onscreen(&mark);
                 }
                 Ok(SerialResponse::DisconnectSuccess) => {
