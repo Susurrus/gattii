@@ -34,7 +34,11 @@ pub struct Error {
 struct Ui {
     window: gtk::Window,
     text_view: gtk::TextView,
+    hex_view: gtk::TextView,
+    scrolled_text_view: gtk::ScrolledWindow,
+    scrolled_hex_view: gtk::ScrolledWindow,
     text_buffer: gtk::TextBuffer,
+    hex_buffer: gtk::TextBuffer,
     file_button: gtk::ToggleButton,
     open_button: gtk::ToggleButton,
     save_button: gtk::ToggleButton,
@@ -47,8 +51,10 @@ struct Ui {
     ports_dropdown: gtk::ComboBoxText,
     ports_map: HashMap<String, i32>,
     line_ending_dropdown: gtk::ComboBoxText,
-    text_view_insert_signal: u64,
+    text_buffer_insert_signal: u64,
+    hex_buffer_insert_signal: u64,
     text_buffer_delete_signal: u64,
+    hex_buffer_delete_signal: u64,
     open_button_clicked_signal: u64,
     file_button_toggled_signal: u64,
     save_button_toggled_signal: u64,
@@ -130,9 +136,6 @@ fn main() {
                 gtk::main_quit();
                 Inhibit(false)
             });
-
-            // Make sure all widgets are displayed
-            ui.window.show_all();
         }
     });
 
@@ -282,21 +285,35 @@ fn ui_init() {
     open_button_container.add(&open_button);
     toolbar.add(&open_button_container);
 
-    // Set up an auto-scrolling text view
-    let text_view = gtk::TextView::new();
+    // Create dual text buffers, one with ASCII text and the other with the hex equivalent. We also
+    // Create an "end" text mark within the buffers that we can use to insert new text. This has
+    // a left-gravity so that inserting text at this mark will keep the mark at the end of it.
+    // This is necessary because the "insert" mark gets moved when users select text.
+    let text_buffer = gtk::TextBuffer::new(None);
+    let mark = text_buffer.get_insert().unwrap();
+    let iter = text_buffer.get_iter_at_mark(&mark);
+    text_buffer.create_mark(Some("end"), &iter, false);
+    let hex_buffer = gtk::TextBuffer::new(None);
+    let mark = hex_buffer.get_insert().unwrap();
+    let iter = hex_buffer.get_iter_at_mark(&mark);
+    hex_buffer.create_mark(Some("end"), &iter, false);
+
+    // Create two text views, one for the text and hex data
+    let text_view = gtk::TextView::new_with_buffer(&text_buffer);
     text_view.set_wrap_mode(gtk::WrapMode::Char);
     text_view.set_cursor_visible(false);
-    let scroll = gtk::ScrolledWindow::new(None, None);
-    scroll.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
-    scroll.add(&text_view);
+    let hex_view = gtk::TextView::new_with_buffer(&hex_buffer);
+    hex_view.set_wrap_mode(gtk::WrapMode::Char);
+    hex_view.set_cursor_visible(false);
 
-    // Create an "end" text mark within the text buffer that we can use to insert new text. This has
-    // a "false" "gravity" so that inserting text at this mark will keep the mark at the end of it.
-    // This is necessary because the "insert" mark gets moved when users select text.
-    let text_view_buffer = text_view.get_buffer().unwrap();
-    let mark = text_view_buffer.get_insert().unwrap();
-    let iter = text_view_buffer.get_iter_at_mark(&mark);
-    text_view_buffer.create_mark(Some("end"), &iter, false);
+    // Set up an auto-scrolling text view for each text view, hiding the hex one. Only one of these
+    // should ever be shown at a time.
+    let scrolled_text_view = gtk::ScrolledWindow::new(None, None);
+    scrolled_text_view.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+    scrolled_text_view.add(&text_view);
+    let scrolled_hex_view = gtk::ScrolledWindow::new(None, None);
+    scrolled_hex_view.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+    scrolled_hex_view.add(&hex_view);
 
     // Add send file button
     let separator = gtk::SeparatorToolItem::new();
@@ -331,8 +348,13 @@ fn ui_init() {
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
     vbox.pack_start(&toolbar, false, false, 0);
-    vbox.pack_start(&scroll, true, true, 0);
+    vbox.pack_start(&scrolled_text_view, true, true, 0);
+    vbox.pack_start(&scrolled_hex_view, true, true, 0);
     window.add(&vbox);
+
+    // Make sure all desired widgets are visible.
+    window.show_all();
+    scrolled_hex_view.hide();
 
     // Set CSS styles for the entire application.
     let css_provider = gtk::CssProvider::new();
@@ -347,7 +369,11 @@ fn ui_init() {
     let ui = Ui {
         window: window.clone(),
         text_view: text_view.clone(),
-        text_buffer: text_view_buffer.clone(),
+        hex_view: hex_view.clone(),
+        scrolled_text_view: scrolled_text_view.clone(),
+        scrolled_hex_view: scrolled_hex_view.clone(),
+        text_buffer: text_buffer.clone(),
+        hex_buffer: hex_buffer.clone(),
         file_button: send_file_button.clone(),
         open_button: open_button.clone(),
         save_button: save_file_button.clone(),
@@ -360,8 +386,10 @@ fn ui_init() {
         ports_dropdown: ports_dropdown.clone(),
         ports_map: ports_dropdown_map,
         line_ending_dropdown: line_ending_dropdown.clone(),
-        text_view_insert_signal: 0,
+        text_buffer_insert_signal: 0,
+        hex_buffer_insert_signal: 0,
         text_buffer_delete_signal: 0,
+        hex_buffer_delete_signal: 0,
         open_button_clicked_signal: 0,
         file_button_toggled_signal: 0,
         save_button_toggled_signal: 0,
@@ -578,81 +606,9 @@ fn ui_connect() {
                 }
             });
 
-            // Configure the right-click menu for the text view widget
-            ui.text_view.connect_populate_popup(|t, p| {
-                if let Ok(popup) = p.clone().downcast::<gtk::Menu>() {
-
-                    // Remove the "delete" menu option as it doesn't even work
-                    // because the "delete-range" signal is disabled.
-                    for c in popup.get_children() {
-                        // Workaround for Bug 778162:
-                        // https://bugzilla.gnome.org/show_bug.cgi?id=778162
-                        if c.is::<gtk::SeparatorMenuItem>() {
-                            continue;
-                        }
-                        if let Ok(child) = c.clone().downcast::<gtk::MenuItem>() {
-                            if let Some(l) = child.get_label() {
-                                if l == "_Delete" {
-                                    popup.remove(&c);
-                                }
-                            }
-                        }
-                    }
-
-                    // Only enable the Paste option if a port is open
-                    GLOBAL.with(|global| {
-                        if let Some((_, _, ref state)) = *global.borrow() {
-                            if !state.connected {
-                                for c in popup.get_children() {
-                                    // Workaround for Bug 778162:
-                                    // https://bugzilla.gnome.org/show_bug.cgi?id=778162
-                                    if c.is::<gtk::SeparatorMenuItem>() {
-                                        continue;
-                                    }
-                                    if let Ok(child) = c.downcast::<gtk::MenuItem>() {
-                                        if let Some(l) = child.get_label() {
-                                            if l == "_Paste" {
-                                                child.set_sensitive(false);
-                                            }
-                                        }
-                                    }
-                                }
-
-                            }
-                        }
-                    });
-
-                    // Add a "Clear All" button that's only active if there's
-                    // data in the buffer.
-                    let clear_all = gtk::MenuItem::new_with_label("Clear All");
-                    if let Some(b) = t.get_buffer() {
-                        if b.get_char_count() == 0 {
-                            clear_all.set_sensitive(false);
-                        } else {
-                            clear_all.connect_activate(|_| {
-                                GLOBAL.with(|global| {
-                                    if let Some((ref ui, _, _)) = *global.borrow() {
-                                        // In order to clear the buffer we need to
-                                        // disable the insert-text and delete-range
-                                        // signal handlers.
-                                        signal_handler_block(&ui.text_buffer,
-                                                             ui.text_view_insert_signal);
-                                        signal_handler_block(&ui.text_buffer,
-                                                             ui.text_buffer_delete_signal);
-                                        ui.text_buffer.set_text("");
-                                        signal_handler_unblock(&ui.text_buffer,
-                                                               ui.text_buffer_delete_signal);
-                                        signal_handler_unblock(&ui.text_buffer,
-                                                               ui.text_view_insert_signal);
-                                    }
-                                });
-                            });
-                        }
-                    }
-                    popup.append(&clear_all);
-                    popup.show_all();
-                }
-            });
+            // Configure the right-click menu for the both the text and hex view widgets
+            ui.text_view.connect_populate_popup(view_populate_popup);
+            ui.hex_view.connect_populate_popup(view_populate_popup);
 
             ui.text_view.connect_key_press_event(|_, k| {
                 GLOBAL.with(|global| {
@@ -696,30 +652,188 @@ fn ui_connect() {
                 Inhibit(false)
             });
 
-            ui.text_view_insert_signal = ui.text_buffer.connect_insert_text(|b, _, text| {
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        let text = text.replace("\n", &state.line_ending);
-                        debug!("Sending {:?}", &text);
-                        let text = text.as_bytes();
-                        match serial_thread.send_port_data_cmd(text) {
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending data command to child \
-                                          thread. Aborting.")
-                            }
-                            Err(_) | Ok(_) => (),
-                        }
-                    }
-                });
-                signal_stop_emission_by_name(b, "insert-text");
-            });
+            // Allow the user to send data by typing/pasting it in either buffer
+            ui.text_buffer_insert_signal = ui.text_buffer.connect_insert_text(buffer_insert);
+            ui.hex_buffer_insert_signal = ui.hex_buffer.connect_insert_text(buffer_insert);
 
             // Disable deletion of characters within the textview
             ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
+            ui.hex_buffer_delete_signal = ui.hex_buffer.connect_delete_range(move |b, _, _| {
+                signal_stop_emission_by_name(b, "delete-range");
+            });
         }
     });
+}
+
+fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
+    if let Ok(popup) = popup.clone().downcast::<gtk::Menu>() {
+
+        // Remove the "delete" menu option as it doesn't even work
+        // because the "delete-range" signal is disabled.
+        for c in popup.get_children() {
+            // Workaround for Bug 778162:
+            // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+            if c.is::<gtk::SeparatorMenuItem>() {
+                continue;
+            }
+            if let Ok(child) = c.clone().downcast::<gtk::MenuItem>() {
+                if let Some(l) = child.get_label() {
+                    if l == "_Delete" {
+                        popup.remove(&c);
+                    }
+                }
+            }
+        }
+
+        // Add the text or Hex view selectors
+        // Note: These are in reverse order because they use `prepend()`.
+        let separator = gtk::SeparatorMenuItem::new();
+        popup.prepend(&separator);
+        let view_hex = gtk::RadioMenuItem::new_with_label(&[], "Hex");
+        popup.prepend(&view_hex);
+        let group = view_hex.get_group();
+        let view_text = gtk::RadioMenuItem::new_with_label(&group, "Text");
+        popup.prepend(&view_text);
+        GLOBAL.with(|global| {
+            if let Some((ref ui, ..)) = *global.borrow() {
+                if ui.scrolled_hex_view.get_visible() {
+                    view_hex.activate();
+                } else if ui.scrolled_text_view.get_visible() {
+                    view_text.activate();
+                }
+            }
+        });
+        view_hex.connect_toggled(|w| {
+            GLOBAL.with(|global| {
+                if let Some((ref ui, ..)) = *global.borrow() {
+                    // The toggle signal triggers on activation and deactivation, so only respond
+                    // to activations here.
+                    if w.get_active() {
+                        // Toggle the shown text view
+                        ui.scrolled_text_view.hide();
+                        ui.scrolled_hex_view.show();
+
+                        // Calculate the relative position of the scroll within the available view.
+                        // Adjustment objects have a range of: [lower, upper-page_size]
+                        let text_vadj = ui.text_view.get_vadjustment().unwrap();
+                        let rel_pos = match text_vadj.get_upper() - text_vadj.get_page_size() {
+                            x if x > 0.0 => text_vadj.get_value() / x,
+                            _ => 0.0,
+                        };
+
+                        // Use this relative position from the text view to generate the new
+                        // relative position for the hex view.
+                        let vadj = ui.hex_view.get_vadjustment().unwrap();
+                        let new_value = vadj.get_lower() +
+                                        rel_pos * (vadj.get_upper() - vadj.get_page_size());
+                        vadj.set_value(new_value);
+                    }
+                }
+            });
+        });
+        view_text.connect_toggled(|w| {
+            GLOBAL.with(|global| {
+                if let Some((ref ui, ..)) = *global.borrow() {
+                    // The toggle signal triggers on activation and deactivation, so only respond
+                    // to activations here.
+                    if w.get_active() {
+                        // Toggle the shown text view
+                        ui.scrolled_hex_view.hide();
+                        ui.scrolled_text_view.show();
+
+                        // Calculate the relative position of the scroll within the available view.
+                        // Adjustment objects have a range of: [lower, upper-page_size]
+                        let hex_vadj = ui.hex_view.get_vadjustment().unwrap();
+                        let rel_pos = match hex_vadj.get_upper() - hex_vadj.get_page_size() {
+                            x if x > 0.0 => hex_vadj.get_value() / x,
+                            _ => 0.0,
+                        };
+
+                        // Use this relative position from the text view to generate the new
+                        // relative position for the hex view.
+                        let vadj = ui.text_view.get_vadjustment().unwrap();
+                        let new_value = vadj.get_lower() +
+                                        rel_pos * (vadj.get_upper() - vadj.get_page_size());
+                        vadj.set_value(new_value);
+                    }
+                }
+            });
+        });
+
+        // Only enable the Paste option if a port is open
+        GLOBAL.with(|global| {
+            if let Some((_, _, ref state)) = *global.borrow() {
+                if !state.connected {
+                    for c in popup.get_children() {
+                        // Workaround for Bug 778162:
+                        // https://bugzilla.gnome.org/show_bug.cgi?id=778162
+                        if c.is::<gtk::SeparatorMenuItem>() {
+                            continue;
+                        }
+                        if let Ok(child) = c.downcast::<gtk::MenuItem>() {
+                            if let Some(l) = child.get_label() {
+                                if l == "_Paste" {
+                                    child.set_sensitive(false);
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+        });
+
+        // Add a "Clear All" button that's only active if there's
+        // data in the buffer.
+        let clear_all = gtk::MenuItem::new_with_label("Clear All");
+        if let Some(b) = text_view.get_buffer() {
+            if b.get_char_count() == 0 {
+                clear_all.set_sensitive(false);
+            } else {
+                clear_all.connect_activate(|_| {
+                    GLOBAL.with(|global| {
+                        if let Some((ref ui, _, _)) = *global.borrow() {
+                            // In order to clear the buffer we need to
+                            // disable the insert-text and delete-range
+                            // signal handlers.
+                            signal_handler_block(&ui.text_buffer, ui.text_buffer_insert_signal);
+                            signal_handler_block(&ui.text_buffer, ui.text_buffer_delete_signal);
+                            ui.text_buffer.set_text("");
+                            signal_handler_unblock(&ui.text_buffer, ui.text_buffer_delete_signal);
+                            signal_handler_unblock(&ui.text_buffer, ui.text_buffer_insert_signal);
+                            signal_handler_block(&ui.hex_buffer, ui.hex_buffer_insert_signal);
+                            signal_handler_block(&ui.hex_buffer, ui.hex_buffer_delete_signal);
+                            ui.hex_buffer.set_text("");
+                            signal_handler_unblock(&ui.hex_buffer, ui.hex_buffer_delete_signal);
+                            signal_handler_unblock(&ui.hex_buffer, ui.hex_buffer_insert_signal);
+                        }
+                    });
+                });
+            }
+        }
+        popup.append(&clear_all);
+        popup.show_all();
+    }
+}
+
+fn buffer_insert(textbuffer: &gtk::TextBuffer, _: &gtk::TextIter, text: &str) {
+    GLOBAL.with(|global| {
+        if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+            let text = text.replace("\n", &state.line_ending);
+            debug!("Sending {:?}", &text);
+            let text = text.as_bytes();
+            match serial_thread.send_port_data_cmd(text) {
+                Err(GeneralError::Send(_)) => {
+                    error!("Error sending data command to child \
+                              thread. Aborting.")
+                }
+                Err(_) | Ok(_) => (),
+            }
+        }
+    });
+    signal_stop_emission_by_name(textbuffer, "insert-text");
 }
 
 fn receive() -> glib::Continue {
@@ -727,28 +841,57 @@ fn receive() -> glib::Continue {
         if let Some((ref ui, ref serial_thread, ref mut state)) = *global.borrow_mut() {
             let window = &ui.window;
             let view = &ui.text_view;
-            let buf = &ui.text_buffer;
+            let ascii_buf = &ui.text_buffer;
+            let hex_buf = &ui.hex_buffer;
             let f_button = &ui.file_button;
             let s_button = &ui.save_button;
             let o_button = &ui.open_button;
             match serial_thread.from_port_chan_rx.try_recv() {
                 Ok(SerialResponse::Data(data)) => {
+                    debug!("Received '{:?}'", data);
 
                     // Don't know why this needs to be this complicated, but found
                     // the answer on the gtk+ forums:
                     // http://www.gtkforums.com/viewtopic.php?t=1307
 
+                    // Add the text to the Hex buffer first
                     // Get the position of our special "end" mark, which will always stay at the end
                     // of the buffer.
-                    let mark = buf.get_mark("end").unwrap();
-                    let mut iter = buf.get_iter_at_mark(&mark);
+                    let mark = hex_buf.get_mark("end").unwrap();
+                    let mut iter = hex_buf.get_iter_at_mark(&mark);
 
-                    // Inserts buffer at the end
-                    signal_handler_block(buf, ui.text_view_insert_signal);
-                    buf.insert(&mut iter, &String::from_utf8_lossy(&data));
-                    signal_handler_unblock(buf, ui.text_view_insert_signal);
+                    let mut hex_data = Vec::new();
+                    for c in &data {
+                        let upper_half = (c & 0xF0) >> 4;
+                        if upper_half >= 10 {
+                            hex_data.push('A' as u8 + upper_half - 10)
+                        } else {
+                            hex_data.push('0' as u8 + upper_half);
+                        }
+                        let lower_half = c & 0x0F;
+                        if lower_half >= 10 {
+                            hex_data.push('A' as u8 + lower_half - 10)
+                        } else {
+                            hex_data.push('0' as u8 + lower_half);
+                        }
+                        hex_data.push(' ' as u8);
+                    }
 
-                    // Keep the textview scrolled to the bottom
+                    // Inserts data at the end
+                    signal_handler_block(hex_buf, ui.hex_buffer_insert_signal);
+                    hex_buf.insert(&mut iter, &String::from_utf8_lossy(&hex_data));
+                    signal_handler_unblock(hex_buf, ui.hex_buffer_insert_signal);
+
+                    // Add the text to the ASCII buffer
+                    let mark = ascii_buf.get_mark("end").unwrap();
+                    let mut iter = ascii_buf.get_iter_at_mark(&mark);
+                    signal_handler_block(ascii_buf, ui.text_buffer_insert_signal);
+                    ascii_buf.insert(&mut iter, &String::from_utf8_lossy(&data));
+                    signal_handler_unblock(ascii_buf, ui.text_buffer_insert_signal);
+
+                    // Keep the textview scrolled to the bottom. This is indepenent of which buffer
+                    // is active, so we just need to do it once.
+                    let mark = view.get_buffer().unwrap().get_mark("end").unwrap();
                     view.scroll_mark_onscreen(&mark);
                 }
                 Ok(SerialResponse::DisconnectSuccess) => {
