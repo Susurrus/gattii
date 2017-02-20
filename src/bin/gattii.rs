@@ -104,7 +104,6 @@ fn main() {
 
     ui_connect();
 
-
     GLOBAL.with(|global| {
         if let Some((ref ui, _, _)) = *global.borrow() {
 
@@ -399,8 +398,11 @@ fn ui_init() {
         line_ending: "\n".to_string(),
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() =
-            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+        *global.borrow_mut() = Some((ui,
+                                     SerialThread::new(|| {
+                                         glib::idle_add(receive);
+                                     }),
+                                     state));
     });
 }
 
@@ -486,10 +488,11 @@ fn ui_connect() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_close_cmd() {
-                                Err(GeneralError::Send(_)) => error!("Error sending port_close \
-                                                                      command to child thread. \
-                                                                      Aborting."),
-                                Err(_) | Ok(_) => ()
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending port_close command to child thread. \
+                                            Aborting.")
+                                }
+                                Err(_) | Ok(_) => (),
                             }
                         }
                     });
