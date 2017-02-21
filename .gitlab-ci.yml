@@ -34,7 +34,6 @@ test:rustfmt:
     - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
-    # Also run rustfmt checks on stable
     - cargo install rustfmt
     - cargo fmt -- --write-mode=diff
 
@@ -49,6 +48,16 @@ test:nightly:
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
     - cargo build --verbose
-    # Also run clippy on nightly
+
+test:clippy:
+    image: "debian:testing"
+    script:
+    - export RUST_ARCHIVE=rust-nightly-x86_64-unknown-linux-gnu.tar.gz
+    - export RUST_DOWNLOAD_URL=https://static.rust-lang.org/dist/$RUST_ARCHIVE
+    - curl -fsOSL $RUST_DOWNLOAD_URL
+    - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
+    - tar -xzf $RUST_ARCHIVE --strip-components=1
+    - ./install.sh
+    - cargo build --verbose
     - cargo install clippy
     - cargo clippy -- --allow=cyclomatic_complexity
