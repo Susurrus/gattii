@@ -75,7 +75,7 @@ package:
     image: "debian:testing"
     artifacts:
       paths:
-      - target/release/gattii
+      - gattii
       name: "$CI_BUILD_REF_NAME"
     stage: package
     script:
@@ -86,4 +86,5 @@ package:
     - tar -xzf $RUST_ARCHIVE --strip-components=1
     - ./install.sh
     - cargo build --release
+    - cp target/release/gattii .
 
