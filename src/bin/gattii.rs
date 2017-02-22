@@ -389,11 +389,8 @@ fn ui_init() {
         line_ending: "\n".to_string(),
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui,
-                                     SerialThread::new(|| {
-                                         glib::idle_add(receive);
-                                     }),
-                                     state));
+        *global.borrow_mut() =
+            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
     });
 }
 
@@ -401,10 +398,9 @@ fn ui_connect() {
 
     GLOBAL.with(|global| {
         if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            ui.baud_dropdown.connect_changed(move |s| {
-                if let Some(baud_rate) = s.get_active_text() {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+            ui.baud_dropdown
+                .connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
+                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
                                 Err(GeneralError::Parse(_)) => {
                                     error!("Invalid baud rate '{}' specified.", &baud_rate)
@@ -415,15 +411,12 @@ fn ui_connect() {
                                 }
                                 Ok(_) => (),
                             }
-                        }
-                    });
-                }
-            });
+                        });
+                });
 
-            ui.ports_dropdown.connect_changed(move |s| {
-                if let Some(port_name) = s.get_active_text() {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+            ui.ports_dropdown
+                .connect_changed(move |s| if let Some(port_name) = s.get_active_text() {
+                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_port_cmd(port_name.clone()) {
                                 Err(GeneralError::Parse(_)) => {
                                     error!("Invalid port name '{}' specified.", &port_name)
@@ -434,21 +427,17 @@ fn ui_connect() {
                                 }
                                 Ok(_) => (),
                             }
-                        }
-                    });
-                }
-            });
+                        });
+                });
 
             ui.line_ending_dropdown.connect_changed(move |s| {
-                GLOBAL.with(|global| {
-                    if let Some((_, _, ref mut state)) = *global.borrow_mut() {
-                        state.line_ending = match s.get_active_text() {
-                            Some(ref x) if x == "\\n" => "\n".to_string(),
-                            Some(ref x) if x == "\\r" => "\r".to_string(),
-                            Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
-                            Some(_) | None => unreachable!(),
-                        };
-                    }
+                GLOBAL.with(|global| if let Some((_, _, ref mut state)) = *global.borrow_mut() {
+                    state.line_ending = match s.get_active_text() {
+                        Some(ref x) if x == "\\n" => "\n".to_string(),
+                        Some(ref x) if x == "\\r" => "\r".to_string(),
+                        Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
+                        Some(_) | None => unreachable!(),
+                    };
                 });
             });
 
@@ -476,8 +465,7 @@ fn ui_connect() {
                         }
                     });
                 } else {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_close_cmd() {
                                 Err(GeneralError::Send(_)) => {
                                     error!("Error sending port_close command to child thread. \
@@ -485,8 +473,7 @@ fn ui_connect() {
                                 }
                                 Err(_) | Ok(_) => (),
                             }
-                        }
-                    });
+                        });
                 }
             });
 
@@ -509,18 +496,16 @@ fn ui_connect() {
                     8.0 => DataBits::Eight,
                     _ => unreachable!(),
                 };
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_data_bits_cmd(data_bits) {
-                            Err(GeneralError::Parse(_)) => {
-                                unreachable!();
-                            }
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending data bits change command \
-                                          to child thread. Aborting.")
-                            }
-                            Ok(_) => (),
+                GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    match serial_thread.send_port_change_data_bits_cmd(data_bits) {
+                        Err(GeneralError::Parse(_)) => {
+                            unreachable!();
                         }
+                        Err(GeneralError::Send(_)) => {
+                            error!("Error sending data bits change command to child thread. \
+                                    Aborting.")
+                        }
+                        Ok(_) => (),
                     }
                 });
             });
@@ -532,18 +517,16 @@ fn ui_connect() {
                     2.0 => StopBits::Two,
                     _ => unreachable!(),
                 };
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
-                            Err(GeneralError::Parse(_)) => {
-                                unreachable!();
-                            }
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending stop bits change command \
-                                          to child thread. Aborting.")
-                            }
-                            Ok(_) => (),
+                GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
+                        Err(GeneralError::Parse(_)) => {
+                            unreachable!();
                         }
+                        Err(GeneralError::Send(_)) => {
+                            error!("Error sending stop bits change command to child thread. \
+                                    Aborting.")
+                        }
+                        Ok(_) => (),
                     }
                 });
             });
@@ -557,8 +540,7 @@ fn ui_connect() {
                     Some(_) | None => unreachable!(),
                 };
                 if let Some(parity) = parity {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_parity_cmd(parity) {
                                 Err(GeneralError::Parse(_)) => {
                                     unreachable!();
@@ -569,8 +551,7 @@ fn ui_connect() {
                                 }
                                 Ok(_) => (),
                             }
-                        }
-                    });
+                        });
                 }
             });
 
@@ -583,8 +564,7 @@ fn ui_connect() {
                     Some(_) | None => unreachable!(),
                 };
                 if let Some(flow_control) = flow_control {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_flow_control_cmd(flow_control) {
                                 Err(GeneralError::Parse(_)) => {
                                     unreachable!();
@@ -595,8 +575,7 @@ fn ui_connect() {
                                 }
                                 Ok(_) => (),
                             }
-                        }
-                    });
+                        });
                 }
             });
 
@@ -690,13 +669,11 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
         let group = view_hex.get_group();
         let view_text = gtk::RadioMenuItem::new_with_label(&group, "Text");
         popup.prepend(&view_text);
-        GLOBAL.with(|global| {
-            if let Some((ref ui, ..)) = *global.borrow() {
-                if ui.scrolled_hex_view.get_visible() {
-                    view_hex.activate();
-                } else if ui.scrolled_text_view.get_visible() {
-                    view_text.activate();
-                }
+        GLOBAL.with(|global| if let Some((ref ui, ..)) = *global.borrow() {
+            if ui.scrolled_hex_view.get_visible() {
+                view_hex.activate();
+            } else if ui.scrolled_text_view.get_visible() {
+                view_text.activate();
             }
         });
         view_hex.connect_toggled(|w| {
@@ -813,18 +790,15 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
 }
 
 fn buffer_insert(textbuffer: &gtk::TextBuffer, _: &gtk::TextIter, text: &str) {
-    GLOBAL.with(|global| {
-        if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-            let text = text.replace("\n", &state.line_ending);
-            debug!("Sending {:?}", &text);
-            let text = text.as_bytes();
-            match serial_thread.send_port_data_cmd(text) {
-                Err(GeneralError::Send(_)) => {
-                    error!("Error sending data command to child \
-                              thread. Aborting.")
-                }
-                Err(_) | Ok(_) => (),
+    GLOBAL.with(|global| if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+        let text = text.replace("\n", &state.line_ending);
+        debug!("Sending {:?}", &text);
+        let text = text.as_bytes();
+        match serial_thread.send_port_data_cmd(text) {
+            Err(GeneralError::Send(_)) => {
+                error!("Error sending data command to child thread. Aborting.")
             }
+            Err(_) | Ok(_) => (),
         }
     });
     signal_stop_emission_by_name(textbuffer, "insert-text");
