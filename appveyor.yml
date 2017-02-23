@@ -45,22 +45,40 @@ environment:
     - channel: stable
       platform: x64
       target: x86_64-pc-windows-gnu
+      configuration: Debug
       BITS: 64
   # Stable 32-bit GNU
     - channel: stable
       platform: x86
       target: i686-pc-windows-gnu
+      configuration: Debug
       BITS: 32
   # Nightly 64-bit GNU
     - channel: nightly
       platform: x64
       target: x86_64-pc-windows-gnu
+      configuration: Debug
       BITS: 64
   # Nightly 32-bit GNU
     - channel: nightly
       platform: x86
       target: i686-pc-windows-gnu
+      configuration: Debug
       BITS: 32
+  # Stable 64-bit GNU (release & package)
+    - channel: stable
+      platform: x64
+      target: x86_64-pc-windows-gnu
+      configuration: Release
+      BITS: 64
+      PACKAGE: true
+  # Stable 32-bit GNU (release & package)
+    - channel: stable
+      platform: x86
+      target: i686-pc-windows-gnu
+      configuration: Release
+      BITS: 32
+      PACKAGE: true
 
 ### Allowed failures ###
 
@@ -93,7 +111,11 @@ install:
 
 # Build the project
 build_script:
-  - cargo build
+  - if "%configuration%"=="Release" (
+      cargo build --release
+    ) else
+      cargo build
+    )
 
 # There are no tests, so don't bother running a test stage
 test: false
@@ -102,17 +124,19 @@ test: false
 # instead of in artifacts because artifacts doesn't allow for manipulating
 # the resultant directory path in the archive
 after_build:
-  - mkdir share\icons
-  - cp -r C:\msys64\mingw%BITS%\share\icons\Adwaita share\icons
-  - mkdir share\glib-2.0\schemas
-  - cp C:\msys64\mingw%BITS%\share\glib-2.0\schemas\org.gtk.Settings.FileChooser.gschema.xml share\glib-2.0\schemas
-  - glib-compile-schemas share\glib-2.0\schemas
-  - 7z a gattii.zip share
-  - ldd target\debug\gattii.exe
-  - ldd target\debug\gattii.exe | awk -F"[ ]+" '/mingw/{ gsub(/^\t/,"",$1); print "C:\\\\msys64\\\\mingw%BITS%\\\\bin\\\\"$1 }' | uniq -u > dlls.txt
-  - cat dlls.txt
-  - 7z a gattii.zip -i@dlls.txt
-  - 7z a gattii.zip %APPVEYOR_BUILD_FOLDER%\target\debug\gattii.exe
+  - IF "%PACKAGE%"=="true" (
+      mkdir share\icons
+      cp -r C:\msys64\mingw%BITS%\share\icons\Adwaita share\icons
+      mkdir share\glib-2.0\schemas
+      cp C:\msys64\mingw%BITS%\share\glib-2.0\schemas\org.gtk.Settings.FileChooser.gschema.xml share\glib-2.0\schemas
+      glib-compile-schemas share\glib-2.0\schemas
+      7z a gattii.zip share
+      ldd target\debug\gattii.exe
+      ldd target\debug\gattii.exe | awk -F"[ ]+" '/mingw/{ gsub(/^\t/,"",$1); print "C:\\\\msys64\\\\mingw%BITS%\\\\bin\\\\"$1 }' | uniq -u > dlls.txt
+      cat dlls.txt
+      7z a gattii.zip -i@dlls.txt
+      7z a gattii.zip %APPVEYOR_BUILD_FOLDER%\target\debug\gattii.exe
+    )
 
 artifacts:
   - path: gattii.zip
