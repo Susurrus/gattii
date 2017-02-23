@@ -106,7 +106,8 @@ after_build:
   - cp C:\msys64\mingw%BITS%\share\glib-2.0\schemas\org.gtk.Settings.FileChooser.gschema.xml share\glib-2.0\schemas
   - glib-compile-schemas share\glib-2.0\schemas
   - 7z a gattii.zip share
-  - C:\msys64\usr\bin\bash -lc "cd $APPVEYOR_BUILD_FOLDER && 7z a gattii.zip `ldd target\debug\gattii.exe | grep mingw64 | cut -d" " -f3`"
+  - ldd target\debug\gattii.exe | grep mingw64 | cut -d" " -f3 > dlls.txt
+  - 7z a gattii.zip -i@dlls.txt
   - 7z a gattii.zip %APPVEYOR_BUILD_FOLDER%\target\debug\gattii.exe
 
 artifacts:
