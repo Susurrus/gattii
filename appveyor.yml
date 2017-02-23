@@ -130,7 +130,7 @@ after_build:
   - if "%PACKAGE%"=="true" ( cp C:\msys64\mingw%BITS%\share\glib-2.0\schemas\org.gtk.Settings.FileChooser.gschema.xml share\glib-2.0\schemas )
   - if "%PACKAGE%"=="true" ( glib-compile-schemas share\glib-2.0\schemas )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip share )
-  - if "%PACKAGE%"=="true" ( ldd target\debug\gattii.exe | awk -F"[ ]+" "/mingw/{ gsub(/^\t/,'',$1); print 'C:\\\\msys64\\\\mingw%BITS%\\\\bin\\\\'$1 }" | uniq -u > dlls.txt )
+  - if "%PACKAGE%"=="true" ( ldd target\debug\gattii.exe | awk -F"[ ]+" "/mingw/{ gsub(/^\t/,\"\",$1); print 'C:\\\\msys64\\\\mingw%BITS%\\\\bin\\\\'$1 }" | uniq -u > dlls.txt )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip -i@dlls.txt )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip %APPVEYOR_BUILD_FOLDER%\target\release\gattii.exe )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip resources\style.css )
