@@ -43,22 +43,24 @@ environment:
 
   # Stable 64-bit GNU
     - channel: stable
+      platform: x64
       target: x86_64-pc-windows-gnu
       BITS: 64
   # Stable 32-bit GNU
     - channel: stable
+      platform: x86
       target: i686-pc-windows-gnu
       BITS: 32
   # Nightly 64-bit GNU
     - channel: nightly
+      platform: x64
       target: x86_64-pc-windows-gnu
       BITS: 64
-      #cargoflags: --features "unstable"
   # Nightly 32-bit GNU
     - channel: nightly
+      platform: x86
       target: i686-pc-windows-gnu
       BITS: 32
-      #cargoflags: --features "unstable"
 
 ### Allowed failures ###
 
