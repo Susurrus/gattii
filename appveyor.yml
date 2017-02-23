@@ -106,6 +106,7 @@ after_build:
   - cp C:\msys64\mingw%BITS%\share\glib-2.0\schemas\org.gtk.Settings.FileChooser.gschema.xml share\glib-2.0\schemas
   - glib-compile-schemas share\glib-2.0\schemas
   - 7z a gattii.zip share
+  - ldd target\debug\gattii.exe
   - ldd target\debug\gattii.exe | awk -F"[ ]+" '/mingw/{ gsub(/^\t/,"",$1); print "C:\\\\msys64\\\\mingw%BITS%\\\\bin\\\\"$1 }' > dlls.txt
   - cat dlls.txt
   - 7z a gattii.zip -i@dlls.txt
