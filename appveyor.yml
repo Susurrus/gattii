@@ -113,7 +113,7 @@ install:
 build_script:
   - if "%configuration%"=="Release" (
       cargo build --release
-    ) else
+    ) else (
       cargo build
     )
 
