@@ -109,10 +109,10 @@ install:
 
 ## Build Script ##
 
-# Build the project
+# Build the project using optimizations and removing the console when in release mode
 build_script:
   - if "%configuration%"=="Release" (
-      cargo build --release
+      cargo rustc --release --bin gattii -- -C -mwindows
     ) else (
       cargo build
     )
