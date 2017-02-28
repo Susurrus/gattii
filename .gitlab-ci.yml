@@ -75,7 +75,7 @@ package:
     image: "debian:testing"
     artifacts:
       paths:
-      - resources/style.css
+      - resources
       - gattii
       name: "$CI_BUILD_REF_NAME"
     stage: package
