@@ -31,8 +31,8 @@ Functionality
 =============
 
  * Enumerate ports
- * Modify settings/change ports in 1-click
- * Transmit file
+ * Easily modify settings/change ports
+ * Send file
  * Log to file
 
 Software Requirements
