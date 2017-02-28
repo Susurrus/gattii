@@ -30,10 +30,10 @@ Screenshots
 Functionality
 =============
 
- * Enumerate ports
- * Easily modify settings/change ports
- * Send file
- * Log to file
+* Enumerate ports
+* Easily modify settings/change ports
+* Send file
+* Log to file
 
 Software Requirements
 =====================
