@@ -27,9 +27,6 @@ Screenshots
 .. image:: resources/screenshot.png?raw=true
    :alt Screenshot of main window
 
-.. image:: resources/port_options_screenshot.png?raw=true
-   :alt Screenshot of advanced port options
-
 Functionality
 =============
 
