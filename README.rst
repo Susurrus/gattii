@@ -67,3 +67,9 @@ If you'd like to contribute code, you may submit a pull request through Gitlab:
   3. Install build dependencies (listed above under Building)
   4. Create commits and push to Gitlab.
   5. `Submit a merge request <https://gitlab.com/susurrus/gattii/merge_requests/new>`_
+
+Attribution
+===========
+
+The send file icon is Upload by AlePio from the Noun Project.
+The log to file icon is based on Download by AlePio from the Noun Project.

@@ -314,9 +314,7 @@ fn ui_init() {
     toolbar.add(&separator);
     let send_file_button = gtk::ToggleButton::new();
     send_file_button.set_tooltip_text("Send file");
-    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
-    // is resolved
-    let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    let send_file_image = gtk::Image::new_from_file("resources/upload.svg");
     send_file_button.set_image(&send_file_image);
     send_file_button.set_sensitive(false);
     let send_file_button_container = gtk::ToolItem::new();
@@ -326,9 +324,7 @@ fn ui_init() {
     // Add save file button
     let save_file_button = gtk::ToggleButton::new();
     save_file_button.set_tooltip_text("Log to file");
-    // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
-    // is resolved
-    let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
+    let save_file_image = gtk::Image::new_from_file("resources/download.svg");
     save_file_button.set_image(&save_file_image);
     save_file_button.set_sensitive(false);
     let save_file_button_container = gtk::ToolItem::new();
