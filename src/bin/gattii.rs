@@ -313,7 +313,7 @@ fn ui_init() {
     separator.set_expand(true);
     toolbar.add(&separator);
     let send_file_button = gtk::ToggleButton::new();
-    send_file_button.set_tooltip_text("Transmit file");
+    send_file_button.set_tooltip_text("Send file");
     // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
     // is resolved
     let send_file_image = gtk::Image::new_from_icon_name("folder", 2);
@@ -325,7 +325,7 @@ fn ui_init() {
 
     // Add save file button
     let save_file_button = gtk::ToggleButton::new();
-    save_file_button.set_tooltip_text("Record to file");
+    save_file_button.set_tooltip_text("Log to file");
     // FIXME: Use gtk::IconSize::SmallToolbar once https://github.com/gtk-rs/gtk/issues/439
     // is resolved
     let save_file_image = gtk::Image::new_from_icon_name("folder", 2);
