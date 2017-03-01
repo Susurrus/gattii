@@ -59,6 +59,7 @@ test:rustfmt:
 
 test:clippy:
     image: "debian:testing"
+    allow_failure: true
     stage: test
     script:
     - export RUST_ARCHIVE=rust-nightly-x86_64-unknown-linux-gnu.tar.gz
