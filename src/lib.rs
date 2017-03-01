@@ -8,7 +8,6 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::sync::mpsc;
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -48,7 +47,7 @@ pub enum SerialResponse {
 #[derive(Debug)]
 pub enum GeneralError {
     Parse(num::ParseIntError),
-    Send(mpsc::SendError<SerialCommand>),
+    Send(SerialCommand),
 }
 
 pub enum ReadBytes {
@@ -347,14 +346,14 @@ impl SerialThread {
                 name: port_name,
                 baud: baud_rate,
             })
-            .map_err(GeneralError::Send)?;
+            .map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_close_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::Disconnect).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::Disconnect).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
@@ -362,14 +361,14 @@ impl SerialThread {
         let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_change_data_bits_cmd(&self, data_bits: DataBits) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangeDataBits(data_bits)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangeDataBits(data_bits)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
@@ -378,63 +377,64 @@ impl SerialThread {
                                              -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangeFlowControl(flow_control)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangeFlowControl(flow_control))
+            .map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_change_stop_bits_cmd(&self, stop_bits: StopBits) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangeStopBits(stop_bits)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangeStopBits(stop_bits)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_change_parity_cmd(&self, parity: Parity) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangeParity(parity)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangeParity(parity)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_change_port_cmd(&self, port_name: String) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::ChangePort(port_name)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::ChangePort(port_name)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_data_cmd(&self, data: &[u8]) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::SendData(data.into())).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::SendData(data.into())).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_port_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::SendFile(path)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::SendFile(path)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_cancel_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::CancelSendFile).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::CancelSendFile).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_log_to_file_cmd(&self, path: PathBuf) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::LogToFile(path)).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::LogToFile(path)).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 
     pub fn send_cancel_log_to_file_cmd(&self) -> Result<(), GeneralError> {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
-        tx.send(SerialCommand::CancelLogToFile).map_err(GeneralError::Send)?;
+        tx.send(SerialCommand::CancelLogToFile).map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
 }
