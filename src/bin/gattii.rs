@@ -594,7 +594,7 @@ fn ui_connect() {
                                 if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
                                     cmd = match key {
                                         '@' => Some((0, key)),
-                                        'A'...'Z' => Some((1 + key as u8 - 'a' as u8, key)),
+                                        'A'...'Z' => Some((1 + key as u8 - 'A' as u8, key)),
                                         '[' => Some((27, key)),
                                         '\\' => Some((28, key)),
                                         ']' => Some((29, key)),
