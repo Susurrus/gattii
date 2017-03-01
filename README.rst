@@ -56,6 +56,8 @@ Licensing
 
 This project is licensed under the GPL version 3 or later. See the LICENSE file for the license text.
 
+If you received a compiled version of this code, a copy of the source code can be found online at https://gitlab.com/susurrus/gattii.
+
 How to Contribute
 =================
 
