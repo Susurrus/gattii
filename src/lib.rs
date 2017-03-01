@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 
 pub use self::serialport::prelude::*;
 
+#[derive(Debug)]
 pub enum SerialCommand {
     CancelSendFile,
     ChangeBaud(usize),
@@ -31,6 +32,7 @@ pub enum SerialCommand {
     CancelLogToFile,
 }
 
+#[derive(Debug)]
 pub enum SerialResponse {
     Data(Vec<u8>),
     SendingFileCanceled,
