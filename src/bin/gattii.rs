@@ -594,7 +594,7 @@ fn ui_connect() {
                                 if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
                                     cmd = match key {
                                         '@' => Some((0, key)),
-                                        'A'...'Z' => Some((1 + key as u8 - 'A' as u8, key)),
+                                        'A'...'Z' => Some((1 + key as u8 - b'A', key)),
                                         '[' => Some((27, key)),
                                         '\\' => Some((28, key)),
                                         ']' => Some((29, key)),
@@ -828,17 +828,17 @@ fn receive() -> glib::Continue {
                     for c in &data {
                         let upper_half = (c & 0xF0) >> 4;
                         if upper_half >= 10 {
-                            hex_data.push('A' as u8 + upper_half - 10)
+                            hex_data.push(b'A' + upper_half - 10)
                         } else {
-                            hex_data.push('0' as u8 + upper_half);
+                            hex_data.push(b'0' + upper_half);
                         }
                         let lower_half = c & 0x0F;
                         if lower_half >= 10 {
-                            hex_data.push('A' as u8 + lower_half - 10)
+                            hex_data.push(b'A' + lower_half - 10)
                         } else {
-                            hex_data.push('0' as u8 + lower_half);
+                            hex_data.push(b'0' + lower_half);
                         }
-                        hex_data.push(' ' as u8);
+                        hex_data.push(b' ');
                     }
 
                     // Inserts data at the end
