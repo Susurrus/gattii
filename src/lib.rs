@@ -36,6 +36,11 @@ pub enum SerialResponse {
     Data(Vec<u8>),
     SendingFileCanceled,
     SendingFileComplete,
+    /// Response to `SerialCommand::SendFile`. Confirms that the file has been opened successfully
+    /// and data is going to be sent.
+    SendingFileStarted,
+    /// Status response indicating what percentage of transmission a file is at
+    SendingFileProgress(u8),
     SendingFileError(String),
     OpenPortSuccess,
     OpenPortError(String),
@@ -86,6 +91,8 @@ impl SerialThread {
             let mut port: Option<Box<SerialPort>> = None;
             let mut read_file: Option<Box<File>> = None;
             let mut bytes_read = 0u64;
+            let mut bytes_total = 0u64;
+            let mut last_percentage = 0u8;
             let mut write_file: Option<Box<File>> = None;
 
             let mut serial_buf: Vec<u8> = vec![0; 1000];
@@ -198,13 +205,16 @@ impl SerialThread {
                     }
                     Ok(SerialCommand::SendFile(f)) => {
                         if port.is_some() {
-                            info!("Sending file {:?} ({} bytes)",
-                                  f,
-                                  fs::metadata(&f).unwrap().len());
+                            bytes_total = fs::metadata(&f).unwrap().len();
+                            last_percentage = 0;
+                            bytes_read = 0;
+                            info!("Sending file {:?} ({} bytes)", f, bytes_total);
                             match File::open(f) {
                                 Ok(file) => read_file = Some(Box::new(file)),
                                 Err(e) => error!("{:?}", e),
                             }
+                            from_port_chan_tx.send(SerialResponse::SendingFileStarted).unwrap();
+                            callback();
                         } else {
                             let err_str = String::from("No open port to send file");
                             let error = SerialResponse::SendingFileError(err_str);
@@ -295,6 +305,15 @@ impl SerialThread {
                                     bytes_read += len as u64;
                                     debug!("Actually read {} bytes ({} total)", len, bytes_read);
                                     read_len = ReadBytes::Bytes(len);
+                                    let percentage =
+                                        (bytes_read as f32 / bytes_total as f32 * 100.0) as u8;
+                                    if percentage >= last_percentage + 5 {
+                                        from_port_chan_tx
+                                            .send(SerialResponse::SendingFileProgress(percentage))
+                                            .unwrap();
+                                        callback();
+                                        last_percentage = percentage;
+                                    }
                                 }
                                 Err(e) => {
                                     error!("File error trying to read {} bytes", tx_data_len);
