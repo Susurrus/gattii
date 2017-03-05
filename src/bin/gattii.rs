@@ -988,8 +988,7 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
                     if serial_thread.send_log_to_file_cmd(filename).is_err() {
-                        error!("Error sending log_to_file command to child \
-                                thread. Aborting.");
+                        error!("Error sending log_to_file command to child thread. Aborting.");
                         b.set_sensitive(true);
                         b.set_active(false);
                     }
