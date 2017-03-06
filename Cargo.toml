@@ -19,9 +19,13 @@ argparse = "0.2"
 env_logger = "0.4"
 log = "0.3"
 glib = { git = "https://github.com/gtk-rs/glib" }
-gdk = { git = "https://github.com/gtk-rs/gdk" }
+cairo-rs = { git = "https://github.com/gtk-rs/cairo" }
+#glib = { path = "../glib" }
+#gdk = { git = "https://github.com/gtk-rs/gdk" }
+gdk = { path = "../gdk" }
 serialport = "1.0.1"
 
 [dependencies.gtk]
-git = "https://github.com/gtk-rs/gtk"
+#git = "https://github.com/gtk-rs/gtk"
+path = "../gtk"
 features = ["v3_14"]
