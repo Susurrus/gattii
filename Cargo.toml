@@ -16,6 +16,7 @@ travis-ci = { repository = "Susurrus/gattii" }
 
 [dependencies]
 argparse = "0.2"
+chrono = "0.3"
 env_logger = "0.4"
 log = "0.3"
 glib = { git = "https://github.com/gtk-rs/glib" }
