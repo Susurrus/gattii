@@ -519,7 +519,7 @@ fn ui_connect() {
                         }
                     });
                 } else {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    GLOBAL.with(|global| if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_close_cmd() {
                                 Err(GeneralError::Send(_)) => {
                                     error!("Error sending port_close command to child thread. \
@@ -527,6 +527,7 @@ fn ui_connect() {
                                 }
                                 Err(_) | Ok(_) => (),
                             }
+                            ui.file_button.set_image(&ui.file_button_static_icon);
                         });
                 }
             });
