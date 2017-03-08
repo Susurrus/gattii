@@ -1,13 +1,13 @@
 extern crate argparse;
+extern crate chrono;
 extern crate core;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
+extern crate gattii;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
-
-extern crate gattii;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -15,6 +15,7 @@ use std::process;
 use std::string::String;
 
 use argparse::{ArgumentParser, Store};
+use chrono::prelude::*;
 use gtk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 
@@ -25,10 +26,10 @@ enum ExitCode {
     ArgumentError = 1,
 }
 
-#[derive(Debug)]
-pub struct Error {
-    code: ExitCode,
-    description: String,
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum StatusContext {
+    PortOperation,
+    FileOperation,
 }
 
 struct Ui {
@@ -42,6 +43,8 @@ struct Ui {
     file_button: gtk::ToggleButton,
     open_button: gtk::ToggleButton,
     save_button: gtk::ToggleButton,
+    status_bar: gtk::Statusbar,
+    status_bar_contexts: HashMap<StatusContext, u32>,
     data_bits_scale: gtk::Scale,
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
@@ -331,11 +334,25 @@ fn ui_init() {
     save_file_button_container.add(&save_file_button);
     toolbar.add(&save_file_button_container);
 
+    // Add a status bar
+    let status_bar = gtk::Statusbar::new();
+    // A context id for port operations (open, close, change port, change settings, etc.)
+    let context_id_port_ops = status_bar.get_context_id("port operations");
+    // A context id for file operations (log file start & end, send file start & end)
+    let context_id_file_ops = status_bar.get_context_id("file operations");
+    let context_map: HashMap<StatusContext, u32> =
+        [(StatusContext::PortOperation, context_id_port_ops),
+         (StatusContext::FileOperation, context_id_file_ops)]
+            .iter()
+            .cloned()
+            .collect();
+
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
     vbox.pack_start(&toolbar, false, false, 0);
     vbox.pack_start(&scrolled_text_view, true, true, 0);
     vbox.pack_start(&scrolled_hex_view, true, true, 0);
+    vbox.pack_start(&status_bar, false, false, 0);
     window.add(&vbox);
 
     // Make sure all desired widgets are visible.
@@ -363,6 +380,8 @@ fn ui_init() {
         file_button: send_file_button.clone(),
         open_button: open_button.clone(),
         save_button: save_file_button.clone(),
+        status_bar: status_bar.clone(),
+        status_bar_contexts: context_map,
         data_bits_scale: data_bits_scale.clone(),
         stop_bits_scale: stop_bits_scale.clone(),
         parity_dropdown: parity_dropdown.clone(),
@@ -385,8 +404,11 @@ fn ui_init() {
         line_ending: "\n".to_string(),
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() =
-            Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+        *global.borrow_mut() = Some((ui,
+                                     SerialThread::new(|| {
+            glib::idle_add(receive);
+        }),
+                                     state));
     });
 }
 
@@ -869,12 +891,14 @@ fn receive() -> glib::Continue {
                     s_button.set_active(false);
                     signal_handler_unblock(s_button, ui.save_button_toggled_signal);
                     state.connected = false;
+                    log_status(&ui, StatusContext::PortOperation, "Port closed");
                 }
                 Ok(SerialResponse::OpenPortSuccess) => {
                     f_button.set_sensitive(true);
                     s_button.set_sensitive(true);
                     o_button.set_active(true);
                     state.connected = true;
+                    log_status(&ui, StatusContext::PortOperation, "Port opened");
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
                     debug!("OpenPortError: {}", s);
@@ -891,14 +915,22 @@ fn receive() -> glib::Continue {
                     o_button.set_active(false);
                     signal_handler_unblock(o_button, ui.open_button_clicked_signal);
                     state.connected = false;
+                    log_status(&ui, StatusContext::PortOperation, "Error opening port");
                 }
-                Ok(SerialResponse::SendingFileComplete) |
+                Ok(SerialResponse::SendingFileComplete) => {
+                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
+                    f_button.set_active(false);
+                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
+                    view.set_editable(true);
+                    log_status(&ui, StatusContext::FileOperation, "Sending file finished");
+                }
                 Ok(SerialResponse::SendingFileCanceled) => {
                     info!("Sending file complete");
                     signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
                     f_button.set_active(false);
                     signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
+                    log_status(&ui, StatusContext::FileOperation, "Sending file canceled");
                 }
                 Ok(SerialResponse::SendingFileError(_)) => {
                     f_button.set_active(false);
@@ -910,6 +942,9 @@ fn receive() -> glib::Continue {
                                                          "Error sending file");
                     dialog.run();
                     dialog.destroy();
+                    log_status(&ui,
+                               StatusContext::FileOperation,
+                               "Error while sending file");
                 }
                 Ok(SerialResponse::LogToFileError(_)) => {
                     s_button.set_active(false);
@@ -920,10 +955,14 @@ fn receive() -> glib::Continue {
                                                          "Error logging to file");
                     dialog.run();
                     dialog.destroy();
+                    log_status(&ui,
+                               StatusContext::FileOperation,
+                               "Error while logging to file");
                 }
                 Ok(SerialResponse::LoggingFileCanceled) => {
                     info!("Logging file canceled");
                     s_button.set_active(false);
+                    log_status(&ui, StatusContext::FileOperation, "Logging to file stopped");
                 }
                 Err(_) => (),
             }
@@ -946,13 +985,24 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 let result = dialog.run();
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
-                    match serial_thread.send_port_file_cmd(filename) {
+                    match serial_thread.send_port_file_cmd(filename.clone()) {
                         Err(_) => {
                             error!("Error sending port_file command to child thread. Aborting.");
                             b.set_sensitive(true);
                             b.set_active(false);
+                            log_status(&ui,
+                                       StatusContext::FileOperation,
+                                       "Error trying to send file");
                         }
-                        Ok(_) => view.set_editable(false),
+                        Ok(_) => {
+                            // TODO: Add a SerialResponse::SendingFileStarted and move this into
+                            // receive()
+                            view.set_editable(false);
+                            log_status(&ui,
+                                       StatusContext::FileOperation,
+                                       &format!("Started sending file '{}'",
+                                                filename.to_str().unwrap()));
+                        }
                     }
                 } else {
                     // Make the button look inactive if the user canceled the
@@ -988,10 +1038,16 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
                 let result = dialog.run();
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
-                    if serial_thread.send_log_to_file_cmd(filename).is_err() {
+                    if serial_thread.send_log_to_file_cmd(filename.clone()).is_err() {
                         error!("Error sending log_to_file command to child thread. Aborting.");
                         b.set_sensitive(true);
                         b.set_active(false);
+                    } else {
+                        // TODO: Add a SerialResponse::LogToFileStarted and move this into receive()
+                        log_status(&ui,
+                                   StatusContext::FileOperation,
+                                   &format!("Started logging to file '{}'",
+                                            filename.to_str().unwrap()));
                     }
                 } else {
                     // Make the button look inactive if the user canceled the
@@ -1013,4 +1069,12 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
             }
         }
     });
+}
+
+/// Log messages to the status bar using the specific status context.
+fn log_status(ui: &Ui, context: StatusContext, message: &str) {
+    let context_id = ui.status_bar_contexts.get(&context).unwrap();
+    let timestamp = UTC::now().format("%Y-%m-%d %H:%M:%S");
+    let formatted_message = format!("[{}]: {}", timestamp, message);
+    ui.status_bar.push(*context_id, &formatted_message);
 }
