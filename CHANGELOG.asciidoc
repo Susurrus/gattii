@@ -11,6 +11,8 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 * The line ending to send when hitting ENTER is now selectable
 * Control codes can be sent by hitting CTRL and one of @, A-Z, [, \, ], ^, _
 * Alternate text view "hex", which shows input character in hex
+* Status bar displays messages about port activity (port open/close, send file
+  start/finish, log to file start/finish)
 
 ==== Changed
 * Reduced GTK+ version requirements to 3.14+
