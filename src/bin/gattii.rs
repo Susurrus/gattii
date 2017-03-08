@@ -91,10 +91,9 @@ fn main() {
             .add_option(&["-p", "--port"],
                         Store,
                         "The serial port name (COM3, /dev/ttyUSB0, etc.)");
-        ap.refer(&mut serial_baud)
-            .add_option(&["-b", "--baud"],
-                        Store,
-                        "The serial port baud rate (default 115200)");
+        ap.refer(&mut serial_baud).add_option(&["-b", "--baud"],
+                                              Store,
+                                              "The serial port baud rate (default 115200)");
         ap.parse_args_or_exit();
     }
 
@@ -135,9 +134,9 @@ fn main() {
 
             // Set deleting the window to close the entire application
             ui.window.connect_delete_event(|_, _| {
-                gtk::main_quit();
-                Inhibit(false)
-            });
+                                               gtk::main_quit();
+                                               Inhibit(false)
+                                           });
         }
     });
 
@@ -343,9 +342,9 @@ fn ui_init() {
     let context_map: HashMap<StatusContext, u32> =
         [(StatusContext::PortOperation, context_id_port_ops),
          (StatusContext::FileOperation, context_id_file_ops)]
-            .iter()
-            .cloned()
-            .collect();
+                .iter()
+                .cloned()
+                .collect();
 
     // Pack everything vertically
     let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -404,49 +403,49 @@ fn ui_init() {
         line_ending: "\n".to_string(),
     };
     GLOBAL.with(move |global| {
-        *global.borrow_mut() = Some((ui,
-                                     SerialThread::new(|| {
-            glib::idle_add(receive);
-        }),
-                                     state));
-    });
+                    *global.borrow_mut() =
+                        Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
+                });
 }
 
 fn ui_connect() {
 
     GLOBAL.with(|global| {
         if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            ui.baud_dropdown
-                .connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
-                                Err(GeneralError::Parse(_)) => {
-                                    error!("Invalid baud rate '{}' specified.", &baud_rate)
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending port_open command to child thread. \
-                                            Aborting.")
-                                }
-                                Ok(_) => (),
+            ui.baud_dropdown.connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
+                                                 GLOBAL.with(|global| {
+                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                        match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                            Err(GeneralError::Parse(_)) => {
+                                error!("Invalid baud rate '{}' specified.", &baud_rate)
                             }
-                        });
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending port_open command to child thread. \
+                                            Aborting.")
+                            }
+                            Ok(_) => (),
+                        }
+                    }
                 });
+            });
 
-            ui.ports_dropdown
-                .connect_changed(move |s| if let Some(port_name) = s.get_active_text() {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+            ui.ports_dropdown.connect_changed(move |s| if let Some(port_name) =
+                s.get_active_text() {
+                    GLOBAL.with(|global| {
+                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_change_port_cmd(port_name.clone()) {
                                 Err(GeneralError::Parse(_)) => {
                                     error!("Invalid port name '{}' specified.", &port_name)
                                 }
                                 Err(GeneralError::Send(_)) => {
                                     error!("Error sending change_port command to child thread. \
-                                            Aborting.")
+                                                Aborting.")
                                 }
                                 Ok(_) => (),
                             }
-                        });
-                });
+                        }
+                    });
+            });
 
             ui.line_ending_dropdown.connect_changed(move |s| {
                 GLOBAL.with(|global| if let Some((_, _, ref mut state)) = *global.borrow_mut() {
@@ -467,11 +466,13 @@ fn ui_connect() {
                                 if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
                                     match serial_thread.send_port_open_cmd(port_name,
                                                                            baud_rate.clone()) {
-                                        Err(GeneralError::Parse(_)) =>
-                                            error!("Invalid baud rate '{}' specified.", &baud_rate),
-                                        Err(GeneralError::Send(_)) =>
+                                        Err(GeneralError::Parse(_)) => {
+                                            error!("Invalid baud rate '{}' specified.", &baud_rate)
+                                        }
+                                        Err(GeneralError::Send(_)) => {
                                             error!("Error sending port_open command to child \
-                                                    thread. Aborting."),
+                                                    thread. Aborting.")
+                                        }
                                         // After opening the port has succeeded, set the focus on
                                         // the text view so the user can start sending data
                                         // immediately (this also prevents ENTER from closing the
@@ -559,17 +560,15 @@ fn ui_connect() {
                 };
                 if let Some(parity) = parity {
                     GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_parity_cmd(parity) {
-                                Err(GeneralError::Parse(_)) => {
-                                    unreachable!();
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending parity change command \
-                                              to child thread. Aborting.")
-                                }
-                                Ok(_) => (),
+                        match serial_thread.send_port_change_parity_cmd(parity) {
+                            Err(GeneralError::Parse(_)) => unreachable!(),
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending parity change command \
+                                  to child thread. Aborting.")
                             }
-                        });
+                            Ok(_) => (),
+                        }
+                    });
                 }
             });
 
@@ -651,9 +650,11 @@ fn ui_connect() {
             ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
                 signal_stop_emission_by_name(b, "delete-range");
             });
-            ui.hex_buffer_delete_signal = ui.hex_buffer.connect_delete_range(move |b, _, _| {
-                signal_stop_emission_by_name(b, "delete-range");
-            });
+            ui.hex_buffer_delete_signal =
+                ui.hex_buffer.connect_delete_range(move |b, _, _| {
+                                                       signal_stop_emission_by_name(b,
+                                                                                    "delete-range");
+                                                   });
         }
     });
 }
@@ -877,7 +878,10 @@ fn receive() -> glib::Continue {
 
                     // Keep the textview scrolled to the bottom. This is indepenent of which buffer
                     // is active, so we just need to do it once.
-                    let mark = view.get_buffer().unwrap().get_mark("end").unwrap();
+                    let mark = view.get_buffer()
+                        .unwrap()
+                        .get_mark("end")
+                        .unwrap();
                     view.scroll_mark_onscreen(&mark);
                 }
                 Ok(SerialResponse::DisconnectSuccess) => {

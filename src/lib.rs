@@ -343,9 +343,9 @@ impl SerialThread {
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
         tx.send(SerialCommand::ConnectToPort {
-                name: port_name,
-                baud: baud_rate,
-            })
+                      name: port_name,
+                      baud: baud_rate,
+                  })
             .map_err(|e| GeneralError::Send(e.0))?;
         Ok(())
     }
