@@ -295,7 +295,7 @@ fn ui_init() {
 
     // This drawing area draws a pie-chart showing progress as stored in the
     // `GLOBAL::state.send_file_percentage` variable.
-    // See https://github.com/GNOME/nautilus/blob/7f8cc0b8892105b24f944ac24248ba3b5f37ecbf/src/nautilus-toolbar.c#L688
+    // See src/nautilus-toolbar.c, line 688, from GTK's nautilus program.
     let operations_icon = gtk::DrawingArea::new();
     operations_icon.show();
     operations_icon.set_size_request(16, 16);
