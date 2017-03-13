@@ -540,8 +540,8 @@ fn ui_connect() {
                         }
                     });
                 } else {
-                    GLOBAL.with(|global| if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_close_cmd() {
+                    GLOBAL.with(|global| if let Some((ref ui, ref sthread, _)) = *global.borrow() {
+                            match sthread.send_port_close_cmd() {
                                 Err(GeneralError::Send(_)) => {
                                     error!("Error sending port_close command to child thread. \
                                             Aborting.")
@@ -746,12 +746,12 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
         let view_text = gtk::RadioMenuItem::new_with_label(&group, "Text");
         popup.prepend(&view_text);
         GLOBAL.with(|global| if let Some((ref ui, ..)) = *global.borrow() {
-            if ui.scrolled_hex_view.get_visible() {
-                view_hex.activate();
-            } else if ui.scrolled_text_view.get_visible() {
+                        if ui.scrolled_hex_view.get_visible() {
+                            view_hex.activate();
+                        } else if ui.scrolled_text_view.get_visible() {
                 view_text.activate();
             }
-        });
+                    });
         view_hex.connect_toggled(|w| {
             GLOBAL.with(|global| {
                 if let Some((ref ui, ..)) = *global.borrow() {
