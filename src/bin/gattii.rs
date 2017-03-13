@@ -1,13 +1,15 @@
 extern crate argparse;
+extern crate cairo;
 extern crate chrono;
 extern crate core;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate gattii;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
+
+extern crate gattii;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -15,9 +17,11 @@ use std::process;
 use std::string::String;
 
 use argparse::{ArgumentParser, Store};
+use cairo::Context;
 use chrono::prelude::*;
-use gtk::prelude::*;
+use gdk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
+use gtk::prelude::*;
 
 use gattii::*;
 
@@ -61,6 +65,8 @@ struct Ui {
     open_button_clicked_signal: u64,
     file_button_toggled_signal: u64,
     save_button_toggled_signal: u64,
+    file_button_progress_icon: gtk::DrawingArea,
+    file_button_static_icon: gtk::Image,
 }
 
 struct State {
@@ -68,6 +74,8 @@ struct State {
     connected: bool,
     /// The line ending that is sent when ENTER is pressed
     line_ending: String,
+    /// The percentage completion of sending a file [0, 100]
+    send_file_percentage: u8,
 }
 
 // declare a new thread local storage key
@@ -279,6 +287,75 @@ fn ui_init() {
     open_button_container.add(&open_button);
     toolbar.add(&open_button_container);
 
+    // Add some horizontally-expanding space
+    let separator = gtk::SeparatorToolItem::new();
+    separator.set_draw(false);
+    separator.set_expand(true);
+    toolbar.add(&separator);
+
+    // This drawing area draws a pie-chart showing progress as stored in the
+    // `GLOBAL::state.send_file_percentage` variable.
+    // See https://github.com/GNOME/nautilus/blob/7f8cc0b8892105b24f944ac24248ba3b5f37ecbf/src/nautilus-toolbar.c#L688
+    let operations_icon = gtk::DrawingArea::new();
+    operations_icon.show();
+    operations_icon.set_size_request(16, 16);
+    // FIXME: Simplify the following line once gtk-rs#468 is resolved
+    //        (https://github.com/gtk-rs/gtk/issues/468)
+    operations_icon.add_events((gdk::BUTTON_PRESS_MASK | gdk::BUTTON_RELEASE_MASK).bits() as i32);
+    operations_icon.connect_draw(|w, c| {
+        GLOBAL.with(|global| {
+            if let Some((.., ref state)) = *global.borrow() {
+                let style_context = w.get_style_context().unwrap();
+                // Blocking on: https://github.com/gtk-rs/gtk/issues/454
+                let foreground = style_context.get_color(w.get_state_flags());
+                let mut background = foreground.clone();
+                background.alpha *= 0.3;
+                let background = background;
+                let width = w.get_allocated_width() as f64;
+                let height = w.get_allocated_height() as f64;
+                let two_pi = 2.0 * std::f64::consts::PI;
+                <Context as ContextExt>::set_source_rgba(&c, &background);
+                c.arc(width / 2.0,
+                      height / 2.0,
+                      width.min(height) / 2.0,
+                      0.0,
+                      two_pi);
+                c.fill();
+                c.move_to(width / 2.0, height / 2.0);
+                <Context as ContextExt>::set_source_rgba(&c, &foreground);
+                let arc_start = -std::f64::consts::FRAC_PI_2;
+                let arc_end = arc_start + state.send_file_percentage as f64 / 100.0 * two_pi;
+                c.arc(width / 2.0,
+                      height / 2.0,
+                      width.min(height) / 2.0,
+                      arc_start,
+                      arc_end);
+                c.fill();
+            }
+        });
+        Inhibit(false)
+    });
+
+    // Add send file button
+    let send_file_button = gtk::ToggleButton::new();
+    send_file_button.set_tooltip_text("Send file");
+    let send_file_image = gtk::Image::new_from_file("resources/upload.svg");
+    send_file_button.set_image(&send_file_image);
+    send_file_button.set_sensitive(false);
+    let send_file_button_container = gtk::ToolItem::new();
+    send_file_button_container.add(&send_file_button);
+    toolbar.add(&send_file_button_container);
+
+    // Add save file button
+    let save_file_button = gtk::ToggleButton::new();
+    save_file_button.set_tooltip_text("Log to file");
+    let save_file_image = gtk::Image::new_from_file("resources/download.svg");
+    save_file_button.set_image(&save_file_image);
+    save_file_button.set_sensitive(false);
+    let save_file_button_container = gtk::ToolItem::new();
+    save_file_button_container.add(&save_file_button);
+    toolbar.add(&save_file_button_container);
+
     // Create dual text buffers, one with ASCII text and the other with the hex equivalent. We also
     // Create an "end" text mark within the buffers that we can use to insert new text. This has
     // a left-gravity so that inserting text at this mark will keep the mark at the end of it.
@@ -308,30 +385,6 @@ fn ui_init() {
     let scrolled_hex_view = gtk::ScrolledWindow::new(None, None);
     scrolled_hex_view.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scrolled_hex_view.add(&hex_view);
-
-    // Add send file button
-    let separator = gtk::SeparatorToolItem::new();
-    separator.set_draw(false);
-    separator.set_expand(true);
-    toolbar.add(&separator);
-    let send_file_button = gtk::ToggleButton::new();
-    send_file_button.set_tooltip_text("Send file");
-    let send_file_image = gtk::Image::new_from_file("resources/upload.svg");
-    send_file_button.set_image(&send_file_image);
-    send_file_button.set_sensitive(false);
-    let send_file_button_container = gtk::ToolItem::new();
-    send_file_button_container.add(&send_file_button);
-    toolbar.add(&send_file_button_container);
-
-    // Add save file button
-    let save_file_button = gtk::ToggleButton::new();
-    save_file_button.set_tooltip_text("Log to file");
-    let save_file_image = gtk::Image::new_from_file("resources/download.svg");
-    save_file_button.set_image(&save_file_image);
-    save_file_button.set_sensitive(false);
-    let save_file_button_container = gtk::ToolItem::new();
-    save_file_button_container.add(&save_file_button);
-    toolbar.add(&save_file_button_container);
 
     // Add a status bar
     let status_bar = gtk::Statusbar::new();
@@ -397,10 +450,13 @@ fn ui_init() {
         open_button_clicked_signal: 0,
         file_button_toggled_signal: 0,
         save_button_toggled_signal: 0,
+        file_button_progress_icon: operations_icon,
+        file_button_static_icon: send_file_image,
     };
     let state = State {
         connected: false,
         line_ending: "\n".to_string(),
+        send_file_percentage: 0,
     };
     GLOBAL.with(move |global| {
                     *global.borrow_mut() =
@@ -484,7 +540,7 @@ fn ui_connect() {
                         }
                     });
                 } else {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    GLOBAL.with(|global| if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
                             match serial_thread.send_port_close_cmd() {
                                 Err(GeneralError::Send(_)) => {
                                     error!("Error sending port_close command to child thread. \
@@ -492,6 +548,7 @@ fn ui_connect() {
                                 }
                                 Err(_) | Ok(_) => (),
                             }
+                            ui.file_button.set_image(&ui.file_button_static_icon);
                         });
                 }
             });
@@ -926,6 +983,7 @@ fn receive() -> glib::Continue {
                     signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
                     log_status(&ui, StatusContext::FileOperation, "Sending file finished");
+                    f_button.set_image(&ui.file_button_static_icon);
                 }
                 Ok(SerialResponse::SendingFileCanceled) => {
                     info!("Sending file complete");
@@ -934,10 +992,14 @@ fn receive() -> glib::Continue {
                     signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
                     log_status(&ui, StatusContext::FileOperation, "Sending file canceled");
+                    f_button.set_image(&ui.file_button_static_icon);
                 }
                 Ok(SerialResponse::SendingFileError(_)) => {
+                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
                     f_button.set_active(false);
+                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
+                    f_button.set_image(&ui.file_button_static_icon);
                     let dialog = gtk::MessageDialog::new(Some(window),
                                                          gtk::DIALOG_DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
@@ -948,6 +1010,15 @@ fn receive() -> glib::Continue {
                     log_status(&ui,
                                StatusContext::FileOperation,
                                "Error while sending file");
+                }
+                Ok(SerialResponse::SendingFileStarted) => {
+                    f_button.set_image(&ui.file_button_progress_icon);
+                    state.send_file_percentage = 0;
+                }
+                Ok(SerialResponse::SendingFileProgress(i)) => {
+                    info!("Sending file {}% complete", i);
+                    state.send_file_percentage = i;
+                    ui.file_button_progress_icon.queue_draw();
                 }
                 Ok(SerialResponse::LogToFileError(_)) => {
                     s_button.set_active(false);
