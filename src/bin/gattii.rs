@@ -309,7 +309,6 @@ fn ui_init() {
         GLOBAL.with(|global| {
             if let Some((.., ref state)) = *global.borrow() {
                 let style_context = w.get_style_context().unwrap();
-                // Blocking on: https://github.com/gtk-rs/gtk/issues/454
                 let foreground = style_context.get_color(w.get_state_flags());
                 let mut background = foreground.clone();
                 background.alpha *= 0.3;
