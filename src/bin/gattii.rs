@@ -281,9 +281,12 @@ fn ui_init() {
     port_settings_button_container.add(&port_settings_button);
     toolbar.add(&port_settings_button_container);
 
-    // Add the open button
+    // Add the open button, disabling it if no ports are available
     let open_button_container = gtk::ToolItem::new();
     let open_button = gtk::ToggleButton::new_with_label("Open");
+    if ports_dropdown_map.is_empty() {
+        open_button.set_sensitive(false);
+    }
     open_button_container.add(&open_button);
     toolbar.add(&open_button_container);
 
