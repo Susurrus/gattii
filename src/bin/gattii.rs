@@ -57,7 +57,6 @@ struct Ui {
     baud_map: HashMap<String, i32>,
     ports_dropdown: gtk::ComboBoxText,
     ports_map: HashMap<String, i32>,
-    line_ending_dropdown: gtk::ComboBoxText,
     text_buffer_insert_signal: u64,
     hex_buffer_insert_signal: u64,
     text_buffer_delete_signal: u64,
@@ -264,17 +263,6 @@ fn ui_init() {
     flow_control_dropdown.append(None, "Software");
     flow_control_dropdown.set_active(0);
     popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
-    let separator = gtk::SeparatorMenuItem::new();
-    popover_container.attach(&separator, 0, 4, 2, 1);
-    let line_ending_label = gtk::Label::new("Enter sends:");
-    line_ending_label.set_halign(gtk::Align::End);
-    popover_container.attach(&line_ending_label, 0, 5, 1, 1);
-    let line_ending_dropdown = gtk::ComboBoxText::new();
-    line_ending_dropdown.append(None, "\\n");
-    line_ending_dropdown.append(None, "\\r");
-    line_ending_dropdown.append(None, "\\r\\n");
-    line_ending_dropdown.set_active(0);
-    popover_container.attach(&line_ending_dropdown, 1, 5, 1, 1);
     popover_container.show_all();
     port_settings_popover.add(&popover_container);
     let port_settings_button_container = gtk::ToolItem::new();
@@ -444,7 +432,6 @@ fn ui_init() {
         baud_map: baud_dropdown_map,
         ports_dropdown: ports_dropdown.clone(),
         ports_map: ports_dropdown_map,
-        line_ending_dropdown: line_ending_dropdown.clone(),
         text_buffer_insert_signal: 0,
         hex_buffer_insert_signal: 0,
         text_buffer_delete_signal: 0,
@@ -503,17 +490,6 @@ fn ui_connect() {
                             }
                         }
                     });
-            });
-
-            ui.line_ending_dropdown.connect_changed(move |s| {
-                GLOBAL.with(|global| if let Some((_, _, ref mut state)) = *global.borrow_mut() {
-                    state.line_ending = match s.get_active_text() {
-                        Some(ref x) if x == "\\n" => "\n".to_string(),
-                        Some(ref x) if x == "\\r" => "\r".to_string(),
-                        Some(ref x) if x == "\\r\\n" => "\r\n".to_string(),
-                        Some(_) | None => unreachable!(),
-                    };
-                });
             });
 
             ui.open_button_clicked_signal = ui.open_button.connect_clicked(move |s| {
@@ -738,6 +714,64 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
             }
         }
 
+        let separator = gtk::SeparatorMenuItem::new();
+        popup.prepend(&separator);
+
+        // Add a submenu for selecting the newline to use
+        let newline_submenu = gtk::Menu::new();
+        let newline_n = gtk::RadioMenuItem::new_with_label(&[], "\\n");
+        let group = newline_n.get_group();
+        newline_submenu.append(&newline_n);
+        let newline_r = gtk::RadioMenuItem::new_with_label(&group, "\\r");
+        newline_submenu.append(&newline_r);
+        let newline_rn = gtk::RadioMenuItem::new_with_label(&group, "\\r\\n");
+        newline_submenu.append(&newline_rn);
+        GLOBAL.with(|global| if let Some((.., ref state)) = *global.borrow() {
+                        match state.line_ending.as_ref() {
+                            "\n" => newline_n.activate(),
+                            "\r" => newline_r.activate(),
+                            "\r\n" => newline_rn.activate(),
+                            _ => unreachable!(),
+                        };
+                    });
+        newline_n.connect_toggled(|w| {
+            GLOBAL.with(|global| {
+                if let Some((.., ref mut state)) = *global.borrow_mut() {
+                    // The toggle signal triggers on activation and deactivation, so only respond
+                    // to activations here.
+                    if w.get_active() {
+                        state.line_ending = "\n".to_string();
+                    }
+                }
+            });
+        });
+        newline_r.connect_toggled(|w| {
+            GLOBAL.with(|global| {
+                if let Some((.., ref mut state)) = *global.borrow_mut() {
+                    // The toggle signal triggers on activation and deactivation, so only respond
+                    // to activations here.
+                    if w.get_active() {
+                        state.line_ending = "\r".to_string();
+                    }
+                }
+            });
+        });
+        newline_rn.connect_toggled(|w| {
+            GLOBAL.with(|global| {
+                if let Some((.., ref mut state)) = *global.borrow_mut() {
+                    // The toggle signal triggers on activation and deactivation, so only respond
+                    // to activations here.
+                    if w.get_active() {
+                        state.line_ending = "\r\n".to_string();
+                    }
+                }
+            });
+        });
+
+        let newline = gtk::MenuItem::new_with_label("Enter sends");
+        newline.set_submenu(Some(&newline_submenu));
+        popup.prepend(&newline);
+
         // Add the text or Hex view selectors
         // Note: These are in reverse order because they use `prepend()`.
         let separator = gtk::SeparatorMenuItem::new();
@@ -863,6 +897,7 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
             }
         }
         popup.append(&clear_all);
+
         popup.show_all();
     }
 }
