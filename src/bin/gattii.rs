@@ -129,6 +129,34 @@ fn main() {
                           .takes_value(true)
                           .requires("port")
                           .possible_values(&BAUD_RATES))
+                      .arg(Arg::with_name("data_bits")
+                          .long("data-bits")
+                          .help("Number of bits per character")
+                          .takes_value(true)
+                          .requires("port")
+                          .possible_values(&["5", "6", "7", "8"])
+                          .default_value_if("port", None, "8"))
+                      .arg(Arg::with_name("stop_bits")
+                          .long("stop-bits")
+                          .help("Number of bits terminating a character")
+                          .takes_value(true)
+                          .requires("port")
+                          .possible_values(&["1", "2"])
+                          .default_value_if("port", None, "1"))
+                      .arg(Arg::with_name("parity")
+                          .long("parity")
+                          .help("Type of parity calculation to be used")
+                          .takes_value(true)
+                          .requires("port")
+                          .possible_values(&PARITIES)
+                          .default_value_if("port", None, DEFAULT_PARITY))
+                      .arg(Arg::with_name("flow_control")
+                          .long("flow-control")
+                          .help("Type of flow control to be used")
+                          .takes_value(true)
+                          .requires("port")
+                          .possible_values(&FLOW_CONTROLS)
+                          .default_value_if("port", None, DEFAULT_FLOW_CONTROL))
                       .get_matches();
 
     if gtk::init().is_err() {
@@ -142,29 +170,38 @@ fn main() {
 
     GLOBAL.with(|global| {
         if let Some((ref ui, _, _)) = *global.borrow() {
-
-            let serial_port_name = matches.value_of("port");
-            let serial_baud = matches.value_of("port");
-
-            // Process any command line arguments that were passed. We only need
-            // to check for both arguments as the case of only one being
-            // specified is already checked by clap during parsing.
-            if serial_port_name.is_some() && serial_baud.is_some() {
-                let serial_port_name = serial_port_name.unwrap();
-                let serial_baud = serial_baud.unwrap();
-
+            if let Some(data_bits) = matches.value_of("data_bits") {
+                let data_bits_value = data_bits.parse::<u8>().unwrap() as f64;
+                ui.data_bits_scale.set_value(data_bits_value);
+            }
+            if let Some(stop_bits) = matches.value_of("stop_bits") {
+                let stop_bits_value = stop_bits.parse::<u8>().unwrap() as f64;
+                ui.stop_bits_scale.set_value(stop_bits_value);
+            }
+            if let Some(parity) = matches.value_of("parity") {
+                let parity_dropdown_index = ui.parity_map.get(parity).unwrap();
+                ui.parity_dropdown.set_active(*parity_dropdown_index);
+            }
+            if let Some(flow_control) = matches.value_of("flow_control") {
+                let flow_control_dropdown_index = ui.flow_control_map.get(flow_control).unwrap();
+                ui.flow_control_dropdown.set_active(*flow_control_dropdown_index);
+            }
+            if let Some(serial_baud) = matches.value_of("baud") {
+                let baud_dropdown_index = ui.baud_map.get(serial_baud).unwrap();
+                ui.baud_dropdown.set_active(*baud_dropdown_index);
+            }
+            if let Some(serial_port_name) = matches.value_of("port") {
                 if let Some(ports_dropdown_index) = ui.ports_map.get(serial_port_name) {
                     ui.ports_dropdown.set_active(*ports_dropdown_index as i32);
                 } else {
                     error!("Invalid port name '{}' specified.", serial_port_name);
                     process::exit(ExitCode::ArgumentError as i32);
                 }
-                if let Some(baud_dropdown_index) = ui.baud_map.get(serial_baud) {
-                    ui.baud_dropdown.set_active(*baud_dropdown_index);
-                } else {
-                    error!("Invalid baud rate '{}' specified.", serial_baud);
-                    process::exit(ExitCode::ArgumentError as i32);
-                }
+            }
+
+            // And if a port was specified and all arguments parsed successfully,
+            // open up the port.
+            if matches.is_present("port") {
                 ui.open_button.set_active(true);
             }
 
