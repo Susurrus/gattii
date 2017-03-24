@@ -185,6 +185,7 @@ fn ui_init() {
     }
     let ports_dropdown_container = gtk::ToolItem::new();
     ports_dropdown_container.add(&ports_dropdown);
+    toolbar.add(&ports_dropdown_container);
 
     // Add a baud rate selector
     let mut baud_dropdown_map = HashMap::new();
@@ -194,7 +195,6 @@ fn ui_init() {
     baud_dropdown_map.insert("38400".to_string(), 3i32);
     baud_dropdown_map.insert("19200".to_string(), 4i32);
     baud_dropdown_map.insert("9600".to_string(), 5i32);
-    toolbar.add(&ports_dropdown_container);
     let baud_dropdown = gtk::ComboBoxText::new();
     baud_dropdown.append(None, "921600");
     baud_dropdown.append(None, "115200");
