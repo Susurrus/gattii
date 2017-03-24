@@ -77,6 +77,16 @@ struct State {
     send_file_percentage: u8,
 }
 
+static BAUD_RATES: [&str; 6] = [
+    "921600",
+    "115200",
+    "57600",
+    "38400",
+    "19200",
+    "9600",
+];
+static DEFAULT_BAUD: &str = "115200";
+
 // declare a new thread local storage key
 thread_local!(
     static GLOBAL: RefCell<Option<(Ui, SerialThread, State)>> = RefCell::new(None)
@@ -189,20 +199,12 @@ fn ui_init() {
 
     // Add a baud rate selector
     let mut baud_dropdown_map = HashMap::new();
-    baud_dropdown_map.insert("921600".to_string(), 0i32);
-    baud_dropdown_map.insert("115200".to_string(), 1i32);
-    baud_dropdown_map.insert("57600".to_string(), 2i32);
-    baud_dropdown_map.insert("38400".to_string(), 3i32);
-    baud_dropdown_map.insert("19200".to_string(), 4i32);
-    baud_dropdown_map.insert("9600".to_string(), 5i32);
     let baud_dropdown = gtk::ComboBoxText::new();
-    baud_dropdown.append(None, "921600");
-    baud_dropdown.append(None, "115200");
-    baud_dropdown.append(None, "57600");
-    baud_dropdown.append(None, "38400");
-    baud_dropdown.append(None, "19200");
-    baud_dropdown.append(None, "9600");
-    baud_dropdown.set_active(5);
+    for (i, b) in BAUD_RATES.iter().enumerate() {
+        baud_dropdown_map.insert(b.to_string(), i as i32);
+        baud_dropdown.append(None, b);
+    }
+    baud_dropdown.set_active(baud_dropdown_map[DEFAULT_BAUD]);
     let baud_dropdown_container = gtk::ToolItem::new();
     baud_dropdown_container.add(&baud_dropdown);
     toolbar.add(&baud_dropdown_container);
