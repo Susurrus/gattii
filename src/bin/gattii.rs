@@ -52,7 +52,9 @@ struct Ui {
     data_bits_scale: gtk::Scale,
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
+    parity_map: HashMap<String, i32>,
     flow_control_dropdown: gtk::ComboBoxText,
+    flow_control_map: HashMap<String, i32>,
     baud_dropdown: gtk::ComboBoxText,
     baud_map: HashMap<String, i32>,
     ports_dropdown: gtk::ComboBoxText,
@@ -86,6 +88,20 @@ static BAUD_RATES: [&str; 6] = [
     "9600",
 ];
 static DEFAULT_BAUD: &str = "115200";
+
+static PARITIES: [&str; 3] = [
+    "none",
+    "odd",
+    "even",
+];
+static DEFAULT_PARITY: &str = "none";
+
+static FLOW_CONTROLS: [&str; 3] = [
+    "none",
+    "hardware",
+    "software",
+];
+static DEFAULT_FLOW_CONTROL: &str = "none";
 
 // declare a new thread local storage key
 thread_local!(
@@ -254,19 +270,24 @@ fn ui_init() {
     parity_label.set_halign(gtk::Align::End);
     popover_container.attach(&parity_label, 0, 2, 1, 1);
     let parity_dropdown = gtk::ComboBoxText::new();
-    parity_dropdown.append(None, "None");
-    parity_dropdown.append(None, "Odd");
-    parity_dropdown.append(None, "Even");
-    parity_dropdown.set_active(0);
+    let mut parity_dropdown_map = HashMap::new();
+    for (i, b) in PARITIES.iter().enumerate() {
+        parity_dropdown_map.insert(b.to_string(), i as i32);
+        parity_dropdown.append(None, b);
+    }
+    parity_dropdown.set_active(parity_dropdown_map[DEFAULT_PARITY]);
     popover_container.attach(&parity_dropdown, 1, 2, 1, 1);
     let flow_control_label = gtk::Label::new("Flow control:");
     flow_control_label.set_halign(gtk::Align::End);
     popover_container.attach(&flow_control_label, 0, 3, 1, 1);
     let flow_control_dropdown = gtk::ComboBoxText::new();
-    flow_control_dropdown.append(None, "None");
-    flow_control_dropdown.append(None, "Hardware");
-    flow_control_dropdown.append(None, "Software");
-    flow_control_dropdown.set_active(0);
+    let mut flow_control_dropdown_map = HashMap::new();
+    for (i, b) in FLOW_CONTROLS.iter().enumerate() {
+        flow_control_dropdown_map.insert(b.to_string(), i as i32);
+        flow_control_dropdown.append(None, b);
+    }
+    flow_control_dropdown
+        .set_active(flow_control_dropdown_map[DEFAULT_FLOW_CONTROL]);
     popover_container.attach(&flow_control_dropdown, 1, 3, 1, 1);
     popover_container.show_all();
     port_settings_popover.add(&popover_container);
@@ -432,7 +453,9 @@ fn ui_init() {
         data_bits_scale: data_bits_scale.clone(),
         stop_bits_scale: stop_bits_scale.clone(),
         parity_dropdown: parity_dropdown.clone(),
+        parity_map: parity_dropdown_map,
         flow_control_dropdown: flow_control_dropdown.clone(),
+        flow_control_map: flow_control_dropdown_map,
         baud_dropdown: baud_dropdown.clone(),
         baud_map: baud_dropdown_map,
         ports_dropdown: ports_dropdown.clone(),
@@ -593,9 +616,9 @@ fn ui_connect() {
             // Configure the parity dropdown callback
             ui.parity_dropdown.connect_changed(|s| {
                 let parity = match s.get_active_text() {
-                    Some(ref x) if x == "None" => Some(Parity::None),
-                    Some(ref x) if x == "Odd" => Some(Parity::Odd),
-                    Some(ref x) if x == "Even" => Some(Parity::Even),
+                    Some(ref x) if x == "none" => Some(Parity::None),
+                    Some(ref x) if x == "odd" => Some(Parity::Odd),
+                    Some(ref x) if x == "even" => Some(Parity::Even),
                     Some(_) | None => unreachable!(),
                 };
                 if let Some(parity) = parity {
@@ -615,9 +638,9 @@ fn ui_connect() {
             // Configure the flow control dropdown callback
             ui.flow_control_dropdown.connect_changed(|s| {
                 let flow_control = match s.get_active_text() {
-                    Some(ref x) if x == "None" => Some(FlowControl::None),
-                    Some(ref x) if x == "Software" => Some(FlowControl::Software),
-                    Some(ref x) if x == "Hardware" => Some(FlowControl::Hardware),
+                    Some(ref x) if x == "none" => Some(FlowControl::None),
+                    Some(ref x) if x == "software" => Some(FlowControl::Software),
+                    Some(ref x) if x == "hardware" => Some(FlowControl::Hardware),
                     Some(_) | None => unreachable!(),
                 };
                 if let Some(flow_control) = flow_control {
