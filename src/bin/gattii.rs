@@ -1,6 +1,6 @@
-extern crate argparse;
 extern crate cairo;
 extern crate chrono;
+extern crate clap;
 extern crate core;
 extern crate env_logger;
 #[macro_use]
@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::process;
 use std::string::String;
 
-use argparse::{ArgumentParser, Store};
+use clap::{Arg, App};
 use cairo::Context;
 use chrono::prelude::*;
 use gdk::prelude::*;
@@ -96,23 +96,24 @@ fn main() {
     // Initialize logging
     env_logger::init().expect("Failed to initialize logging");
 
-    // Store command-line arguments
-    let mut serial_port_name = "".to_string();
-    let mut serial_baud = "".to_string();
-
     // Parse command-line arguments
-    {
-        let mut ap = ArgumentParser::new();
-        ap.set_description("A serial terminal.");
-        ap.refer(&mut serial_port_name)
-            .add_option(&["-p", "--port"],
-                        Store,
-                        "The serial port name (COM3, /dev/ttyUSB0, etc.)");
-        ap.refer(&mut serial_baud).add_option(&["-b", "--baud"],
-                                              Store,
-                                              "The serial port baud rate (default 115200)");
-        ap.parse_args_or_exit();
-    }
+    let matches = App::new("Gattii")
+                      .version("0.9.0")
+                      .about("A serial terminal")
+                      .arg(Arg::with_name("port")
+                          .long("port")
+                          .short("p")
+                          .help("The serial port name (COM3, /dev/ttyUSB0, etc.)")
+                          .takes_value(true)
+                          .requires("baud"))
+                      .arg(Arg::with_name("baud")
+                          .long("baud")
+                          .short("b")
+                          .help("The serial port baud rate")
+                          .takes_value(true)
+                          .requires("port")
+                          .possible_values(&BAUD_RATES))
+                      .get_matches();
 
     if gtk::init().is_err() {
         error!("Failed to initialize GTK.");
@@ -126,27 +127,29 @@ fn main() {
     GLOBAL.with(|global| {
         if let Some((ref ui, _, _)) = *global.borrow() {
 
-            // Process any command line arguments that were passed
-            if !serial_port_name.is_empty() && !serial_baud.is_empty() {
-                if let Some(ports_dropdown_index) = ui.ports_map.get(&serial_port_name) {
+            let serial_port_name = matches.value_of("port");
+            let serial_baud = matches.value_of("port");
+
+            // Process any command line arguments that were passed. We only need
+            // to check for both arguments as the case of only one being
+            // specified is already checked by clap during parsing.
+            if serial_port_name.is_some() && serial_baud.is_some() {
+                let serial_port_name = serial_port_name.unwrap();
+                let serial_baud = serial_baud.unwrap();
+
+                if let Some(ports_dropdown_index) = ui.ports_map.get(serial_port_name) {
                     ui.ports_dropdown.set_active(*ports_dropdown_index as i32);
                 } else {
                     error!("Invalid port name '{}' specified.", serial_port_name);
                     process::exit(ExitCode::ArgumentError as i32);
                 }
-                if let Some(baud_dropdown_index) = ui.baud_map.get(&serial_baud) {
+                if let Some(baud_dropdown_index) = ui.baud_map.get(serial_baud) {
                     ui.baud_dropdown.set_active(*baud_dropdown_index);
                 } else {
                     error!("Invalid baud rate '{}' specified.", serial_baud);
                     process::exit(ExitCode::ArgumentError as i32);
                 }
                 ui.open_button.set_active(true);
-            } else if !serial_port_name.is_empty() {
-                error!("A baud rate must be specified.");
-                process::exit(ExitCode::ArgumentError as i32);
-            } else if !serial_baud.is_empty() {
-                error!("A port name must be specified.");
-                process::exit(ExitCode::ArgumentError as i32);
             }
 
             // Set deleting the window to close the entire application
