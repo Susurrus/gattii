@@ -13,6 +13,7 @@ extern crate gattii;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::process;
 use std::string::String;
 
@@ -1147,11 +1148,36 @@ fn receive() -> glib::Continue {
     glib::Continue(false)
 }
 
+fn start_file_send(filename: PathBuf) {
+    GLOBAL.with(|global| {
+        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
+            match serial_thread.send_port_file_cmd(filename.clone()) {
+                Err(_) => {
+                    error!("Error sending port_file command to child thread. Aborting.");
+                    ui.file_button.set_sensitive(true);
+                    ui.file_button.set_active(false);
+                    log_status(&ui,
+                               StatusContext::FileOperation,
+                               "Error trying to send file");
+                }
+                Ok(_) => {
+                    // TODO: Add a SerialResponse::SendingFileStarted and move this into
+                    // receive()
+                    ui.text_view.set_editable(false);
+                    log_status(&ui,
+                               StatusContext::FileOperation,
+                               &format!("Started sending file '{}'",
+                                        filename.to_str().unwrap()));
+                }
+            }
+        }
+    });
+}
+
 fn file_button_connect_toggled(b: &gtk::ToggleButton) {
     GLOBAL.with(|global| {
         if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
             let window = &ui.window;
-            let view = &ui.text_view;
             if b.get_active() {
                 let dialog = gtk::FileChooserDialog::new(Some("Send File"),
                                                          Some(window),
@@ -1161,25 +1187,7 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 let result = dialog.run();
                 if result == gtk::ResponseType::Ok.into() {
                     let filename = dialog.get_filename().unwrap();
-                    match serial_thread.send_port_file_cmd(filename.clone()) {
-                        Err(_) => {
-                            error!("Error sending port_file command to child thread. Aborting.");
-                            b.set_sensitive(true);
-                            b.set_active(false);
-                            log_status(&ui,
-                                       StatusContext::FileOperation,
-                                       "Error trying to send file");
-                        }
-                        Ok(_) => {
-                            // TODO: Add a SerialResponse::SendingFileStarted and move this into
-                            // receive()
-                            view.set_editable(false);
-                            log_status(&ui,
-                                       StatusContext::FileOperation,
-                                       &format!("Started sending file '{}'",
-                                                filename.to_str().unwrap()));
-                        }
-                    }
+                    start_file_send(filename);
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file open dialog
