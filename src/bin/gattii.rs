@@ -80,7 +80,7 @@ struct State {
     send_file_percentage: u8,
 }
 
-static BAUD_RATES: [&str; 6] = [
+static BAUD_RATES: [&'static str; 6] = [
     "921600",
     "115200",
     "57600",
@@ -88,21 +88,21 @@ static BAUD_RATES: [&str; 6] = [
     "19200",
     "9600",
 ];
-static DEFAULT_BAUD: &str = "115200";
+static DEFAULT_BAUD: &'static str = "115200";
 
-static PARITIES: [&str; 3] = [
+static PARITIES: [&'static str; 3] = [
     "none",
     "odd",
     "even",
 ];
-static DEFAULT_PARITY: &str = "none";
+static DEFAULT_PARITY: &'static str = "none";
 
-static FLOW_CONTROLS: [&str; 3] = [
+static FLOW_CONTROLS: [&'static str; 3] = [
     "none",
     "hardware",
     "software",
 ];
-static DEFAULT_FLOW_CONTROL: &str = "none";
+static DEFAULT_FLOW_CONTROL: &'static str = "none";
 
 // declare a new thread local storage key
 thread_local!(
