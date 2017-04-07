@@ -4,7 +4,7 @@ version = "0.9.0"
 dependencies = [
  "cairo-rs 0.1.1 (git+https://github.com/gtk-rs/cairo)",
  "chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.23.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "gdk 0.5.1 (git+https://github.com/gtk-rs/gdk)",
  "glib 0.1.1 (git+https://github.com/gtk-rs/glib)",
@@ -34,10 +34,10 @@ dependencies = [
 [[package]]
 name = "advapi32-sys"
 version = "0.2.0"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/retep998/winapi-rs.git?branch=0.2#77588710a683e1a4ec085b0f3d6c8939ecc7f030"
 dependencies = [
- "winapi 0.2.8 (git+https://gitlab.com/susurrus/serialport-rs)",
- "winapi-build 0.1.1 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "winapi 0.2.8 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
+ "winapi-build 0.1.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
 ]
 
 [[package]]
@@ -56,9 +56,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "atk-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gobject-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -77,11 +77,6 @@ dependencies = [
 
 [[package]]
 name = "bitflags"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "bitflags"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
@@ -92,7 +87,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitflags"
-version = "0.8.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -138,12 +133,12 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "2.22.0"
+version = "2.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "atty 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitflags 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "strsim 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "term_size 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-segmentation 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -163,7 +158,7 @@ dependencies = [
 [[package]]
 name = "gdk"
 version = "0.5.1"
-source = "git+https://github.com/gtk-rs/gdk#26a4c2825b485da6852146d633c4521280163b20"
+source = "git+https://github.com/gtk-rs/gdk#227d7f0f50db40d8158f21fec3b477ea1533ba13"
 dependencies = [
  "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-rs 0.1.1 (git+https://github.com/gtk-rs/cairo)",
@@ -191,9 +186,9 @@ dependencies = [
 [[package]]
 name = "gdk-pixbuf-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "gio-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gobject-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
@@ -204,9 +199,9 @@ dependencies = [
 [[package]]
 name = "gdk-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-sys-rs 0.3.2 (git+https://github.com/gtk-rs/cairo)",
  "gdk-pixbuf-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gio-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
@@ -233,9 +228,9 @@ dependencies = [
 [[package]]
 name = "gio-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gobject-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -245,20 +240,21 @@ dependencies = [
 [[package]]
 name = "glib"
 version = "0.1.1"
-source = "git+https://github.com/gtk-rs/glib#6dabedc25e9c86f44c8c51e284b518791b5e89f6"
+source = "git+https://github.com/gtk-rs/glib#8271fc39a9e69ff873a973d111225925eb6a4050"
 dependencies = [
  "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gobject-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
+ "lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "glib-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -266,9 +262,9 @@ dependencies = [
 [[package]]
 name = "gobject-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -277,7 +273,7 @@ dependencies = [
 [[package]]
 name = "gtk"
 version = "0.1.1"
-source = "git+https://github.com/gtk-rs/gtk#63ea39e5fe8dc9f8800d0662626a9907de4abbb1"
+source = "git+https://github.com/gtk-rs/gtk#b75ced7981a2923d04c4610af9519c6ee85a9850"
 dependencies = [
  "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-rs 0.1.1 (git+https://github.com/gtk-rs/cairo)",
@@ -299,10 +295,10 @@ dependencies = [
 [[package]]
 name = "gtk-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
  "atk-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "cairo-sys-rs 0.3.2 (git+https://github.com/gtk-rs/cairo)",
  "gdk-pixbuf-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gdk-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
@@ -325,10 +321,10 @@ dependencies = [
 [[package]]
 name = "kernel32-sys"
 version = "0.2.2"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/retep998/winapi-rs.git?branch=0.2#77588710a683e1a4ec085b0f3d6c8939ecc7f030"
 dependencies = [
- "winapi 0.2.8 (git+https://gitlab.com/susurrus/serialport-rs)",
- "winapi-build 0.1.1 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "winapi 0.2.8 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
+ "winapi-build 0.1.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
 ]
 
 [[package]]
@@ -341,9 +337,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_static"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "libc"
 version = "0.2.21"
-source = "git+https://github.com/rust-lang/libc#e9238ebc9b401d067f1b539cf9d13519afa041a8"
+source = "git+https://github.com/rust-lang/libc#81310f5d8f8babb9c5f3066bf7075258ecc3d11d"
 
 [[package]]
 name = "libc"
@@ -392,7 +393,7 @@ dependencies = [
 [[package]]
 name = "nix"
 version = "0.8.1-pre"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/nix-rust/nix#44c0ecbc42bc8f5ea132aa07cc612139a2cd74b0"
 dependencies = [
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -446,9 +447,9 @@ dependencies = [
 [[package]]
 name = "pango-sys"
 version = "0.3.2"
-source = "git+https://github.com/gtk-rs/sys#aaa2a305c0ec8c93a9baaa366a7bdbe7dfb44e10"
+source = "git+https://github.com/gtk-rs/sys#b2ff4ccfee33d0db7d9475075f8350ef6ccd2b40"
 dependencies = [
- "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "gobject-sys 0.3.2 (git+https://github.com/gtk-rs/sys)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -485,30 +486,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "serialport"
 version = "1.0.2-pre"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://gitlab.com/susurrus/serialport-rs#39e52a3569b8606d944aadd7a59262ec4dd9f55c"
 dependencies = [
  "CoreFoundation-sys 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "IOKit-sys 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "advapi32-sys 0.2.0 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "advapi32-sys 0.2.0 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
  "ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "kernel32-sys 0.2.2 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "kernel32-sys 0.2.2 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mach 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "nix 0.8.1-pre (git+https://gitlab.com/susurrus/serialport-rs)",
+ "nix 0.8.1-pre (git+https://github.com/nix-rust/nix)",
  "regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "setupapi-sys 0.0.1 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "setupapi-sys 0.0.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
  "termios 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "winapi 0.2.8 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "winapi 0.2.8 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
 ]
 
 [[package]]
 name = "setupapi-sys"
 version = "0.0.1"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/retep998/winapi-rs.git?branch=0.2#77588710a683e1a4ec085b0f3d6c8939ecc7f030"
 dependencies = [
- "winapi 0.2.8 (git+https://gitlab.com/susurrus/serialport-rs)",
- "winapi-build 0.1.1 (git+https://gitlab.com/susurrus/serialport-rs)",
+ "winapi 0.2.8 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
+ "winapi-build 0.1.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)",
 ]
 
 [[package]]
@@ -599,7 +600,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "winapi"
 version = "0.2.8"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/retep998/winapi-rs.git?branch=0.2#77588710a683e1a4ec085b0f3d6c8939ecc7f030"
 
 [[package]]
 name = "winapi"
@@ -609,7 +610,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "winapi-build"
 version = "0.1.1"
-source = "git+https://gitlab.com/susurrus/serialport-rs#36952e7ac6b3e2901d287861a7d347032ea5abfc"
+source = "git+https://github.com/retep998/winapi-rs.git?branch=0.2#77588710a683e1a4ec085b0f3d6c8939ecc7f030"
 
 [[package]]
 name = "winapi-build"
@@ -619,21 +620,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [metadata]
 "checksum CoreFoundation-sys 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5a20f9842210205921293918e29b212d150b4df221d79d05185597920fa76bc9"
 "checksum IOKit-sys 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "192c00e8947371e6a0ddb8abafb2ac7dddd6d8cc4e7488716f3e7f4bf0740193"
-"checksum advapi32-sys 0.2.0 (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum advapi32-sys 0.2.0 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)" = "<none>"
 "checksum aho-corasick 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "500909c4f87a9e52355b26626d890833e9e1d53ac566db76c36faa984b889699"
 "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
 "checksum atk-sys 0.3.2 (git+https://github.com/gtk-rs/sys)" = "<none>"
 "checksum atty 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d912da0db7fa85514874458ca3651fe2cddace8d0b0505571dbdcd41ab490159"
-"checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4f67931368edf3a9a51d29886d245f1c3db2f1ef0dcc9e35ff70341b78c10d23"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
-"checksum bitflags 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "826e1ab483fc81a8143faa7203c4a3c02888ebd1a782e37e41fa34753ba9a162"
+"checksum bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1370e9fc2a6ae53aea8b7a5110edbd08836ed87c88736dfabccade1c2b44bff4"
 "checksum c_vec 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0059f5a658f62a4bd3937a7addc52ccfda144b75cce7a92b187e528629cdc507"
 "checksum cairo-rs 0.1.1 (git+https://github.com/gtk-rs/cairo)" = "<none>"
 "checksum cairo-sys-rs 0.3.2 (git+https://github.com/gtk-rs/cairo)" = "<none>"
 "checksum cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "de1e760d7b6535af4241fca8bd8adf68e2e7edacc6b29f5d399050c5e48cf88c"
 "checksum chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "158b0bd7d75cbb6bf9c25967a48a2e9f77da95876b858eadfabaa99cd069de6e"
-"checksum clap 2.22.0 (registry+https://github.com/rust-lang/crates.io-index)" = "875f4f161166a71c4b7bf2c05f46d26c30d8b9052c16a6bdd3171ddf03848cbe"
+"checksum clap 2.23.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d480c39a2e5f9b3a3798c661613e1b0e7a7ae71e005102d4aa910fc3289df484"
 "checksum env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e3856f1697098606fc6cb97a93de88ca3f3bc35bb878c725920e6e82ecf05e83"
 "checksum gdk 0.5.1 (git+https://github.com/gtk-rs/gdk)" = "<none>"
 "checksum gdk-pixbuf 0.1.1 (git+https://github.com/gtk-rs/gdk-pixbuf)" = "<none>"
@@ -647,8 +647,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum gtk 0.1.1 (git+https://github.com/gtk-rs/gtk)" = "<none>"
 "checksum gtk-sys 0.3.2 (git+https://github.com/gtk-rs/sys)" = "<none>"
 "checksum ioctl-rs 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c733bd6be680c4365bfeb89ac48d4c39ee2c47d933da3601689131471aaf3267"
-"checksum kernel32-sys 0.2.2 (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum kernel32-sys 0.2.2 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)" = "<none>"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
+"checksum lazy_static 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2f61b8421c7a4648c391611625d56fdd5c7567da05af1be655fd8cacc643abb3"
 "checksum libc 0.2.21 (git+https://github.com/rust-lang/libc)" = "<none>"
 "checksum libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)" = "88ee81885f9f04bff991e306fea7c1c60a5f0f9e409e99f6b40e3311a3363135"
 "checksum libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ea626d3bdf40a1c5aee3bcd4f40826970cae8d80a8fec934c82a63840094dcfe"
@@ -656,7 +657,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "5141eca02775a762cc6cd564d8d2c50f67c0ea3a372cbf1c51592b3e029e10ad"
 "checksum mach 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "196697f416cf23cf0d3319cf5b2904811b035c82df1dfec2117fb457699bf277"
 "checksum memchr 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1dbccc0e46f1ea47b9f17e6d67c5a96bd27030519c519c9c91327e31275a47b4"
-"checksum nix 0.8.1-pre (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum nix 0.8.1-pre (git+https://github.com/nix-rust/nix)" = "<none>"
 "checksum num 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)" = "98b15ba84e910ea7a1973bccd3df7b31ae282bf9d8bd2897779950c9b8303d40"
 "checksum num-integer 0.1.33 (registry+https://github.com/rust-lang/crates.io-index)" = "21e4df1098d1d797d27ef0c69c178c3fab64941559b290fcae198e0825c9c8b5"
 "checksum num-iter 0.1.33 (registry+https://github.com/rust-lang/crates.io-index)" = "f7d1891bd7b936f12349b7d1403761c8a0b85a18b148e9da4429d5d102c1a41e"
@@ -668,7 +669,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4278c17d0f6d62dfef0ab00028feb45bd7d2102843f80763474eeb1be8a10c01"
 "checksum regex-syntax 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9191b1f57603095f105d317e375d19b1c9c5c3185ea9633a99a6dcbed04457"
 "checksum serialport 1.0.2-pre (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
-"checksum setupapi-sys 0.0.1 (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum setupapi-sys 0.0.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)" = "<none>"
 "checksum strsim 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b4d15c810519a91cf877e7e36e63fe068815c678181439f2f29e2562147c3694"
 "checksum term_size 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "07b6c1ac5b3fffd75073276bca1ceed01f67a28537097a2a9539e116e50fb21a"
 "checksum termios 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d5d9cf598a6d7ce700a4e6a9199da127e6819a61e64b68609683cc9a01b5683a"
@@ -681,7 +682,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum utf8-ranges 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "662fab6525a98beff2921d7f61a39e7d59e0b425ebc7d0d9e66d316e55124122"
 "checksum vec_map 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f8cdc8b93bd0198ed872357fb2e667f7125646b1762f16d60b2c96350d361897"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-"checksum winapi 0.2.8 (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum winapi 0.2.8 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)" = "<none>"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
-"checksum winapi-build 0.1.1 (git+https://gitlab.com/susurrus/serialport-rs)" = "<none>"
+"checksum winapi-build 0.1.1 (git+https://github.com/retep998/winapi-rs.git?branch=0.2)" = "<none>"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"
