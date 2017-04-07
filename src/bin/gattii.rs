@@ -8,6 +8,7 @@ extern crate log;
 extern crate gdk;
 extern crate glib;
 extern crate gtk;
+extern crate url;
 
 extern crate gattii;
 
@@ -23,6 +24,7 @@ use chrono::prelude::*;
 use gdk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 use gtk::prelude::*;
+use url::Url;
 
 use gattii::*;
 
@@ -427,9 +429,12 @@ fn ui_init() {
     let text_view = gtk::TextView::new_with_buffer(&text_buffer);
     text_view.set_wrap_mode(gtk::WrapMode::Char);
     text_view.set_cursor_visible(false);
+    let targets = vec![gtk::TargetEntry::new("text/uri-list", gtk::TargetFlags::empty(), 0)];
+    text_view.drag_dest_set(gtk::DEST_DEFAULT_ALL, &targets, gdk::ACTION_COPY);
     let hex_view = gtk::TextView::new_with_buffer(&hex_buffer);
     hex_view.set_wrap_mode(gtk::WrapMode::Char);
     hex_view.set_cursor_visible(false);
+    hex_view.drag_dest_set(gtk::DEST_DEFAULT_ALL, &targets, gdk::ACTION_COPY);
 
     // Set up an auto-scrolling text view for each text view, hiding the hex one. Only one of these
     // should ever be shown at a time.
@@ -742,6 +747,10 @@ fn ui_connect() {
                 });
                 Inhibit(false)
             });
+
+            // Configure drag-and-drop callback for the text view widgets
+            ui.text_view.connect_drag_data_received(file_drag_received);
+            ui.hex_view.connect_drag_data_received(file_drag_received);
 
             // Allow the user to send data by typing/pasting it in either buffer
             ui.text_buffer_insert_signal = ui.text_buffer.connect_insert_text(buffer_insert);
@@ -1261,4 +1270,38 @@ fn log_status(ui: &Ui, context: StatusContext, message: &str) {
     let timestamp = UTC::now().format("%Y-%m-%d %H:%M:%S");
     let formatted_message = format!("[{}]: {}", timestamp, message);
     ui.status_bar.push(*context_id, &formatted_message);
+}
+
+fn file_drag_received(w: &gtk::TextView,
+                      context: &gdk::DragContext,
+                      _: i32,
+                      _: i32,
+                      data: &gtk::SelectionData,
+                      _: u32,
+                      time: u32) {
+    // Populate the text view with the contents of the file if only one was received
+    println!("{:?}", &w);
+    let uris = data.get_uris();
+    println!("{:?}", &uris);
+    if uris.len() == 1 {
+        let filename = uris[0].to_string();
+        let file_path = Url::parse(&filename).unwrap().to_file_path().unwrap();
+        start_file_send(file_path);
+    }
+    // There's no good way to handle multiple files in this example, so just alert the user
+    else {
+        GLOBAL.with(|global| {
+            if let Some((ref ui, ..)) = *global.borrow() {
+                let s = "Only 1 text file can be dragged onto this widget".to_owned();
+                let dialog = gtk::MessageDialog::new(Some(&ui.window),
+                                                     gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                     gtk::MessageType::Error,
+                                                     gtk::ButtonsType::Close,
+                                                     &s);
+                dialog.run();
+                dialog.destroy();
+            }
+        });
+    }
+    context.drag_finish(true, false, time);
 }

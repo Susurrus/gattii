@@ -23,6 +23,7 @@ gdk = { git = "https://github.com/gtk-rs/gdk" }
 glib = { git = "https://github.com/gtk-rs/glib" }
 log = "0.3"
 serialport = { git = "https://gitlab.com/susurrus/serialport-rs" }
+url = "1.0"
 
 [dependencies.gtk]
 git = "https://github.com/gtk-rs/gtk"
