@@ -17,13 +17,13 @@ pub use self::serialport::prelude::*;
 #[derive(Debug)]
 pub enum SerialCommand {
     CancelSendFile,
-    ChangeBaud(usize),
+    ChangeBaud(u32),
     ChangeDataBits(DataBits),
     ChangeFlowControl(FlowControl),
     ChangeStopBits(StopBits),
     ChangeParity(Parity),
     ChangePort(String),
-    ConnectToPort { name: String, baud: usize },
+    ConnectToPort { name: String, baud: u32 },
     Disconnect,
     SendData(Vec<u8>),
     SendFile(PathBuf),
@@ -293,8 +293,8 @@ impl SerialThread {
                     // Write 10ms of data at a time to account for loop time
                     // variation
                     if last_send_time.elapsed().subsec_nanos() > loop_time as u32 * 1_000_000 {
-                        let baud = p.baud_rate().unwrap();
-                        let tx_data_len = usize::from(baud) / byte_as_serial_bits / (1000 / loop_time);
+                        let baud: u32 = u32::from(p.baud_rate().unwrap());
+                        let tx_data_len = baud as usize / byte_as_serial_bits / (1000 / loop_time);
                         if let Some(ref mut file) = read_file {
                             debug!("Reading {} bytes", tx_data_len);
                             match file.read(&mut serial_buf_rx[..tx_data_len]) {
@@ -361,7 +361,7 @@ impl SerialThread {
                               port_name: String,
                               baud_rate: String)
                               -> Result<(), GeneralError> {
-        let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
+        let baud_rate: u32 = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
         tx.send(SerialCommand::ConnectToPort {
@@ -380,7 +380,7 @@ impl SerialThread {
     }
 
     pub fn send_port_change_baud_cmd(&self, baud_rate: String) -> Result<(), GeneralError> {
-        let baud_rate: usize = baud_rate.parse().map_err(GeneralError::Parse)?;
+        let baud_rate: u32 = baud_rate.parse().map_err(GeneralError::Parse)?;
         let tx = &self.to_port_chan_tx;
         // TODO: Remove in favor of impl From for GeneralError
         tx.send(SerialCommand::ChangeBaud(baud_rate)).map_err(|e| GeneralError::Send(e.0))?;
