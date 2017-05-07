@@ -16,14 +16,14 @@ travis-ci = { repository = "Susurrus/gattii" }
 
 [dependencies]
 clap = "2.22"
-cairo-rs = { git = "https://github.com/gtk-rs/cairo", features = ["v1_12"] }
+cairo-rs = { version = "0.1.3", features = ["v1_12"] }
 chrono = "0.3"
 env_logger = "0.4"
-gdk = { git = "https://github.com/gtk-rs/gdk" }
-glib = { git = "https://github.com/gtk-rs/glib" }
+gdk = "0.5.3"
+glib = "0.1.3"
 log = "0.3"
 serialport = { git = "https://gitlab.com/susurrus/serialport-rs" }
 
 [dependencies.gtk]
-git = "https://github.com/gtk-rs/gtk"
+version = "0.1.3"
 features = ["v3_14"]
