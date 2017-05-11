@@ -112,9 +112,9 @@ install:
 # Build the project using optimizations and removing the console when in release mode
 build_script:
   - if "%configuration%"=="Release" (
-      cargo rustc --release --bin gattii -- -C link-args=-mwindows
+      cargo rustc --release --bin gattii --target %target% -- -C link-args=-mwindows
     ) else (
-      cargo build
+      cargo build --target %target%
     )
 
 # There are no tests, so don't bother running a test stage
