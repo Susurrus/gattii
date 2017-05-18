@@ -1103,16 +1103,17 @@ fn receive() -> glib::Continue {
                     signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
                     view.set_editable(true);
                     f_button.set_image(&ui.file_button_static_icon);
+                    let s = "Error sending file";
+                    log_status(&ui, StatusContext::FileOperation, &s);
                     let dialog = gtk::MessageDialog::new(Some(window),
                                                          gtk::DIALOG_DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
-                                                         "Error sending file");
-                    dialog.run();
-                    dialog.destroy();
-                    log_status(&ui,
-                               StatusContext::FileOperation,
-                               "Error while sending file");
+                                                         &s);
+                    dialog.connect_response(|w, _| {
+                         w.destroy();
+                    });
+                    dialog.show_all();
                 }
                 Ok(SerialResponse::SendingFileStarted) => {
                     f_button.set_image(&ui.file_button_progress_icon);
