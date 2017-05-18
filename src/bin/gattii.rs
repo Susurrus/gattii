@@ -72,8 +72,8 @@ struct Ui {
 }
 
 struct State {
-    /// True if a serial port is currently connected
-    connected: bool,
+    /// The serial port device that is currently connected. None if no port is connected
+    connected_port: Option<String>,
     /// The line ending that is sent when ENTER is pressed
     line_ending: String,
     /// The percentage completion of sending a file [0, 100]
@@ -509,7 +509,7 @@ fn ui_init() {
         file_button_static_icon: send_file_image,
     };
     let state = State {
-        connected: false,
+        connected_port: None,
         line_ending: "\n".to_string(),
         send_file_percentage: 0,
     };
@@ -704,7 +704,7 @@ fn ui_connect() {
             ui.text_view.connect_key_press_event(|_, k| {
                 GLOBAL.with(|global| {
                     if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        if state.connected {
+                        if state.connected_port.is_some() {
                             let mut cmd: Option<(u8, char)> = None;
                             // Check for a backspace with no modifier keys
                             if k.get_state().is_empty() &&
@@ -914,7 +914,7 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
         // Only enable the Paste option if a port is open
         GLOBAL.with(|global| {
             if let Some((_, _, ref state)) = *global.borrow() {
-                if !state.connected {
+                if state.connected_port.is_none() {
                     for c in popup.get_children() {
                         // Workaround for Bug 778162:
                         // https://bugzilla.gnome.org/show_bug.cgi?id=778162
@@ -985,7 +985,7 @@ fn buffer_insert(textbuffer: &gtk::TextBuffer, _: &gtk::TextIter, text: &str) {
 
 fn receive() -> glib::Continue {
     GLOBAL.with(|global| {
-        if let Some((ref ui, ref serial_thread, ref mut state)) = *global.borrow_mut() {
+        if let Some((ref mut ui, ref serial_thread, ref mut state)) = *global.borrow_mut() {
             let window = &ui.window;
             let view = &ui.text_view;
             let ascii_buf = &ui.text_buffer;
@@ -1053,14 +1053,14 @@ fn receive() -> glib::Continue {
                     signal_handler_block(s_button, ui.save_button_toggled_signal);
                     s_button.set_active(false);
                     signal_handler_unblock(s_button, ui.save_button_toggled_signal);
-                    state.connected = false;
+                    state.connected_port = None;
                     log_status(&ui, StatusContext::PortOperation, "Port closed");
                 }
-                Ok(SerialResponse::OpenPortSuccess) => {
+                Ok(SerialResponse::OpenPortSuccess(s)) => {
                     f_button.set_sensitive(true);
                     s_button.set_sensitive(true);
                     o_button.set_active(true);
-                    state.connected = true;
+                    state.connected_port = Some(s);
                     log_status(&ui, StatusContext::PortOperation, "Port opened");
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
@@ -1077,7 +1077,7 @@ fn receive() -> glib::Continue {
                     signal_handler_block(o_button, ui.open_button_clicked_signal);
                     o_button.set_active(false);
                     signal_handler_unblock(o_button, ui.open_button_clicked_signal);
-                    state.connected = false;
+                    state.connected_port = None;
                     log_status(&ui, StatusContext::PortOperation, "Error opening port");
                 }
                 Ok(SerialResponse::SendingFileComplete) => {

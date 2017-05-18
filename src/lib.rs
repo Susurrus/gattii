@@ -42,7 +42,7 @@ pub enum SerialResponse {
     /// Status response indicating what percentage of transmission a file is at
     SendingFileProgress(u8),
     SendingFileError(String),
-    OpenPortSuccess,
+    OpenPortSuccess(String),
     OpenPortError(String),
     DisconnectSuccess,
     LogToFileError(String),
@@ -114,7 +114,9 @@ impl SerialThread {
                         match serialport::open_with_settings(&name, &settings) {
                             Ok(p) => {
                                 port = Some(p);
-                                from_port_chan_tx.send(SerialResponse::OpenPortSuccess).unwrap();
+                                from_port_chan_tx
+                                    .send(SerialResponse::OpenPortSuccess(name))
+                                    .unwrap();
                             }
                             Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
                                 let err_str = String::from(format!("Port '{}' is already in use \
@@ -174,7 +176,8 @@ impl SerialThread {
                             match serialport::open_with_settings(&name, &settings) {
                                 Ok(p) => {
                                     port = Some(p);
-                                    from_port_chan_tx.send(SerialResponse::OpenPortSuccess)
+                                    from_port_chan_tx
+                                        .send(SerialResponse::OpenPortSuccess(name))
                                         .unwrap();
                                 }
                                 Err(_) => {
