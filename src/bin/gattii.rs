@@ -609,11 +609,11 @@ fn ui_connect() {
 
             // Configure the data bits callback
             ui.data_bits_scale.connect_value_changed(|s| {
-                let data_bits = match s.get_value() {
-                    5.0 => DataBits::Five,
-                    6.0 => DataBits::Six,
-                    7.0 => DataBits::Seven,
-                    8.0 => DataBits::Eight,
+                let data_bits = match s.get_value() as u8 {
+                    5 => DataBits::Five,
+                    6 => DataBits::Six,
+                    7 => DataBits::Seven,
+                    8 => DataBits::Eight,
                     _ => unreachable!(),
                 };
                 GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
@@ -632,9 +632,9 @@ fn ui_connect() {
 
             // Configure the data bits callback
             ui.stop_bits_scale.connect_value_changed(|s| {
-                let stop_bits = match s.get_value() {
-                    1.0 => StopBits::One,
-                    2.0 => StopBits::Two,
+                let stop_bits = match s.get_value() as u8 {
+                    1 => StopBits::One,
+                    2 => StopBits::Two,
                     _ => unreachable!(),
                 };
                 GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
