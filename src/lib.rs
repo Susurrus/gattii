@@ -47,6 +47,12 @@ pub enum SerialResponse {
     DisconnectSuccess,
     LogToFileError(String),
     LoggingFileCanceled,
+    /// A port error has occurred that is likely the result of a serial device disconnected. This
+    /// also returns a list of all still-attached serial devices.
+    UnexpectedDisconnection(Vec<String>),
+    /// A sorted list of ports found during a port scan. Guaranteed to contain the currently-active
+    /// port if there is one.
+    PortsFound(Vec<String>),
 }
 
 #[derive(Debug)]
@@ -101,6 +107,8 @@ impl SerialThread {
             let mut settings: SerialPortSettings = Default::default();
 
             let loop_time = 10usize; // ms
+            let port_scan_time = Duration::from_secs(5);
+            let mut last_port_scan_time = Instant::now();
 
             loop {
                 // First check if we have any incoming commands
@@ -348,6 +356,37 @@ impl SerialThread {
                         }
                         ReadBytes::NoAttempt => (),
                     }
+                }
+
+                // Scan for ports every so often
+                if last_port_scan_time.elapsed() > port_scan_time {
+                    last_port_scan_time = Instant::now();
+                    let mut ports = list_ports().expect("Scanning for ports should never fail");
+                    ports.sort();
+                    debug!("Found ports: {:?}", &ports);
+
+                    // Check if our port was disconnected
+                    let message = {
+                        if let Some(ref mut p) = port {
+                            if let Some(name) = p.port_name() {
+                                if ports.binary_search(&name).is_err() {
+                                    SerialResponse::UnexpectedDisconnection(ports)
+                                } else {
+                                    SerialResponse::PortsFound(ports)
+                                }
+                            } else {
+                                SerialResponse::PortsFound(ports)
+                            }
+                        } else {
+                            SerialResponse::PortsFound(ports)
+                        }
+                    };
+                    match message {
+                        SerialResponse::UnexpectedDisconnection(_) => port = None,
+                        _ => (),
+                    };
+                    from_port_chan_tx.send(message).unwrap();
+                    callback();
                 }
 
                 thread::sleep(Duration::from_millis(loop_time as u64));

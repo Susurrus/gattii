@@ -69,6 +69,7 @@ struct Ui {
     save_button_toggled_signal: u64,
     file_button_progress_icon: gtk::DrawingArea,
     file_button_static_icon: gtk::Image,
+    ports_dropdown_changed_signal: u64,
 }
 
 struct State {
@@ -507,6 +508,7 @@ fn ui_init() {
         save_button_toggled_signal: 0,
         file_button_progress_icon: operations_icon,
         file_button_static_icon: send_file_image,
+        ports_dropdown_changed_signal: 0,
     };
     let state = State {
         connected_port: None,
@@ -540,7 +542,8 @@ fn ui_connect() {
                 });
             });
 
-            ui.ports_dropdown.connect_changed(move |s| if let Some(port_name) =
+            ui.ports_dropdown_changed_signal = ui.ports_dropdown.connect_changed(
+                move |s| if let Some(port_name) =
                 s.get_active_text() {
                     GLOBAL.with(|global| {
                         if let Some((_, ref serial_thread, _)) = *global.borrow() {
@@ -1064,21 +1067,47 @@ fn receive() -> glib::Continue {
                     log_status(&ui, StatusContext::PortOperation, "Port opened");
                 }
                 Ok(SerialResponse::OpenPortError(s)) => {
-                    debug!("OpenPortError: {}", s);
-                    let dialog = gtk::MessageDialog::new(Some(window),
-                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
-                                                         gtk::MessageType::Error,
-                                                         gtk::ButtonsType::Ok,
-                                                         &s);
-                    dialog.run();
-                    dialog.destroy();
                     f_button.set_sensitive(false);
                     s_button.set_sensitive(false);
                     signal_handler_block(o_button, ui.open_button_clicked_signal);
                     o_button.set_active(false);
                     signal_handler_unblock(o_button, ui.open_button_clicked_signal);
+
                     state.connected_port = None;
-                    log_status(&ui, StatusContext::PortOperation, "Error opening port");
+
+                    // We also rescan the ports since it was likely a disconnection that caused this
+                    // error:
+                    let ports = list_ports().unwrap_or_default();
+                    ui.ports_dropdown.remove_all();
+                    ui.ports_map.clear();
+                    if ports.is_empty() {
+                        ui.ports_dropdown.append(None, "No ports found");
+                        ui.ports_dropdown.set_sensitive(false);
+                        o_button.set_sensitive(false);
+                    } else {
+                        for (i, p) in (0i32..).zip(ports.into_iter()) {
+                            ui.ports_dropdown.append(None, &p);
+                            ui.ports_map.insert(p, i);
+                        }
+                        ui.ports_dropdown.set_sensitive(true);
+                        o_button.set_sensitive(true);
+                    }
+                    signal_handler_block(&ui.ports_dropdown, ui.ports_dropdown_changed_signal);
+                    ui.ports_dropdown.set_active(0);
+                    signal_handler_unblock(&ui.ports_dropdown,
+                                           ui.ports_dropdown_changed_signal);
+
+                    let s = format!("Error opening port ({})", s);
+                    log_status(&ui, StatusContext::PortOperation, &s);
+                    let dialog = gtk::MessageDialog::new(Some(window),
+                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         gtk::MessageType::Error,
+                                                         gtk::ButtonsType::Ok,
+                                                         &s);
+                    dialog.connect_response(|w, _| {
+                         w.destroy();
+                    });
+                    dialog.show_all();
                 }
                 Ok(SerialResponse::SendingFileComplete) => {
                     signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
@@ -1124,6 +1153,57 @@ fn receive() -> glib::Continue {
                     state.send_file_percentage = i;
                     ui.file_button_progress_icon.queue_draw();
                 }
+                Ok(SerialResponse::UnexpectedDisconnection(ports)) => {
+                    // Update the port listing and other UI elements
+                    ui.ports_dropdown.remove_all();
+                    ui.ports_map.clear();
+                    if ports.is_empty() {
+                        ui.ports_dropdown.append(None, "No ports found");
+                        ui.ports_dropdown.set_sensitive(false);
+                        o_button.set_sensitive(false);
+                    } else {
+                        for (i, p) in (0i32..).zip(ports.into_iter()) {
+                            ui.ports_dropdown.append(None, &p);
+                            ui.ports_map.insert(p, i);
+                        }
+                        ui.ports_dropdown.set_sensitive(true);
+                        o_button.set_sensitive(true);
+                    }
+                    signal_handler_block(&ui.ports_dropdown,
+                                         ui.ports_dropdown_changed_signal);
+                    ui.ports_dropdown.set_active(0);
+                    signal_handler_unblock(&ui.ports_dropdown,
+                                           ui.ports_dropdown_changed_signal);
+                    f_button.set_sensitive(false);
+                    signal_handler_block(f_button, ui.file_button_toggled_signal);
+                    f_button.set_active(false);
+                    signal_handler_unblock(f_button, ui.file_button_toggled_signal);
+                    s_button.set_sensitive(false);
+                    signal_handler_block(s_button, ui.save_button_toggled_signal);
+                    s_button.set_active(false);
+                    signal_handler_unblock(s_button, ui.save_button_toggled_signal);
+                    signal_handler_block(o_button, ui.open_button_clicked_signal);
+                    o_button.set_active(false);
+                    signal_handler_unblock(o_button, ui.open_button_clicked_signal);
+
+                    // Save the current port name and then update internal state
+                    let name = state.connected_port.take().expect("A port should be connected here");
+                    let s = format!("Port '{}' unexpectedly closed", name);
+
+                    // Warn the user as to what happened
+                    log_status(&ui, StatusContext::PortOperation, &s);
+                    let dialog = gtk::MessageDialog::new(Some(window),
+                                                         gtk::DIALOG_DESTROY_WITH_PARENT |
+                                                         gtk::DIALOG_MODAL,
+                                                         gtk::MessageType::Error,
+                                                         gtk::ButtonsType::Ok,
+                                                         &s);
+                    dialog.connect_response(|w, _| {
+                         w.destroy();
+                    });
+                    dialog.show_all();
+
+                }
                 Ok(SerialResponse::LogToFileError(_)) => {
                     s_button.set_active(false);
                     let dialog = gtk::MessageDialog::new(Some(window),
@@ -1141,6 +1221,58 @@ fn receive() -> glib::Continue {
                     info!("Logging file canceled");
                     s_button.set_active(false);
                     log_status(&ui, StatusContext::FileOperation, "Logging to file stopped");
+                }
+                Ok(SerialResponse::PortsFound(ports)) => {
+                    info!("Found some ports!");
+                    // Determine if the new ports match existing ones
+                    let replace = {
+                        if ports.len() != ui.ports_map.len() {
+                            true
+                        } else {
+                            ports.iter()
+                                 .enumerate()
+                                 .map(|t| ui.ports_map[t.1] != t.0 as i32)
+                                 .all(|x| x)
+                        }
+                    };
+
+                    if replace {
+                        // First save whichever the currently-selected port is
+                        let current_port = {
+                            let active_port = ui.ports_dropdown.get_active();
+                            let mut n = None;
+                            for (p, i) in &ui.ports_map {
+                                if *i == active_port {
+                                    n = Some(p.to_owned());
+                                    break;
+                                }
+                            }
+                            n
+                        };
+
+                        ui.ports_dropdown.remove_all();
+                        ui.ports_map.clear();
+                        if ports.is_empty() {
+                            ui.ports_dropdown.append(None, "No ports found");
+                            ui.ports_dropdown.set_sensitive(false);
+                            o_button.set_sensitive(false);
+                        } else {
+                            for (i, p) in (0i32..).zip(ports.into_iter()) {
+                                ui.ports_dropdown.append(None, &p);
+                                ui.ports_map.insert(p, i);
+                            }
+                            ui.ports_dropdown.set_sensitive(true);
+                            o_button.set_sensitive(true);
+                        }
+                        signal_handler_block(&ui.ports_dropdown, ui.ports_dropdown_changed_signal);
+                        if let Some(p) = current_port {
+                            ui.ports_dropdown.set_active(ui.ports_map[&p]);
+                        } else {
+                            ui.ports_dropdown.set_active(0);
+                        }
+                        signal_handler_unblock(&ui.ports_dropdown,
+                                               ui.ports_dropdown_changed_signal);
+                    }
                 }
                 Err(_) => (),
             }
