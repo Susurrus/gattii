@@ -14,6 +14,10 @@ appveyor = { repository = "Susurrus/gattii", service = "gitlab" }
 gitlab = { repository = "susurrus/gattii" }
 travis-ci = { repository = "Susurrus/gattii" }
 
+[[bin]]
+name = "gattii"
+doc = false
+
 [dependencies]
 clap = "2.22"
 cairo-rs = { version = "0.1.3", features = ["v1_12"] }
