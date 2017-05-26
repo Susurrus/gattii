@@ -124,6 +124,8 @@ test: false
 # instead of in artifacts because artifacts doesn't allow for manipulating
 # the resultant directory path in the archive
 after_build:
+  - if "%PACKAGE%"=="true" ( ls C:\msys64 )
+  - if "%PACKAGE%"=="true" ( ls C:\msys32 )
   - if "%PACKAGE%"=="true" ( mkdir share\icons )
   - if "%PACKAGE%"=="true" ( cp -r C:\msys64\mingw%BITS%\share\icons\Adwaita share\icons )
   - if "%PACKAGE%"=="true" ( mkdir share\glib-2.0\schemas )
