@@ -13,6 +13,8 @@ and this project adheres to http://semver.org/[Semantic Versioning].
 * Alternate text view "hex", which shows input character in hex
 * Status bar displays messages about port activity (port open/close, send file
   start/finish, log to file start/finish)
+* Ports are regularly scanned and the port dropdown is now updated regularly.
+* Port disconnections are now detected and gracefully handled
 
 ==== Changed
 * Reduced GTK+ version requirements to 3.14+
