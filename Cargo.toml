@@ -26,7 +26,7 @@ env_logger = "0.4"
 gdk = "0.5.3"
 glib = "0.1.3"
 log = "0.3"
-serialport = { git = "https://gitlab.com/susurrus/serialport-rs" }
+serialport = "1.0"
 
 [dependencies.gtk]
 version = "0.1.3"
