@@ -30,7 +30,7 @@ Screenshots
 Functionality
 =============
 
-* Enumerate ports
+* Enumerate ports (except on Mac)
 * Easily modify settings/change ports
 * Send file
 * Log to file
@@ -40,7 +40,7 @@ Software Requirements
 
 This software is written in Rust, and as such requires the Rust toolchain to be installed to build it. Additionally there are library requirements for some of supporting libraries (gtk-rs). As `gtk-rs` does not support anything older than the current Rust stable release, `gattii` is also limited to that.
 
-The only tier-1 platform for this is Linux x64, as that's what I develop and test on. I try to be diligent at testing all functionality on Windows, but as it's not my primary OS, some things may slip through the cracks. Windows has Tier 2 support in that compilation testing is done on it, but I don't actively test functionality. That being said, pretty much all functionality should be cross-platform as platform-specific features are under the serialport-rs library.
+The only tier-1 platform for this is Linux x64, as that's what I develop and test on. I try to be diligent at testing all functionality on Windows, but as it's not my primary OS, some things may slip through the cracks. Windows has Tier 2 support in that compilation testing is done on it, but I don't actively test functionality. Mac is Tier 3 in that compilation works, but serial enumeration isn't working until the serialport-rs 2.0 release, but do not expect this to work correctly on Mac.
 
 Building
 ========
