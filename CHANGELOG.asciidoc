@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on http://keepachangelog.com/[Keep a Changelog]
 and this project adheres to http://semver.org/[Semantic Versioning].
 
-=== [1.0.0] - 2017-06-02
+=== [0.10.0] - 2017-06-03
 ==== Added
 * Button to log received data to a file
 * The line ending to send when hitting ENTER is now selectable
