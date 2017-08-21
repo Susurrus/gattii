@@ -23,6 +23,7 @@ use chrono::prelude::*;
 use gdk::prelude::*;
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 use gtk::prelude::*;
+use gtk::WindowExt;
 
 use gattii::*;
 
@@ -269,7 +270,7 @@ fn ui_init() {
 
     // Add the port settings button
     let port_settings_button = gtk::MenuButton::new();
-    port_settings_button.set_direction(gtk::ArrowType::None);
+    MenuButtonExt::set_direction(&port_settings_button, gtk::ArrowType::None);
     let port_settings_popover = gtk::Popover::new(Some(&port_settings_button));
     port_settings_popover.set_position(gtk::PositionType::Bottom);
     // Enable the following once upgrading to GTK+3.20+
@@ -788,12 +789,11 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
 
         // Add a submenu for selecting the newline to use
         let newline_submenu = gtk::Menu::new();
-        let newline_n = gtk::RadioMenuItem::new_with_label(&[], "\\n");
-        let group = newline_n.get_group();
+        let newline_n = gtk::RadioMenuItem::new_with_label("\\n");
         newline_submenu.append(&newline_n);
-        let newline_r = gtk::RadioMenuItem::new_with_label(&group, "\\r");
+        let newline_r = gtk::RadioMenuItem::new_with_label_from_widget(&newline_n, "\\r");
         newline_submenu.append(&newline_r);
-        let newline_rn = gtk::RadioMenuItem::new_with_label(&group, "\\r\\n");
+        let newline_rn = gtk::RadioMenuItem::new_with_label_from_widget(&newline_n, "\\r\\n");
         newline_submenu.append(&newline_rn);
         GLOBAL.with(|global| if let Some((.., ref state)) = *global.borrow() {
                         match state.line_ending.as_ref() {
@@ -845,10 +845,9 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
         // Note: These are in reverse order because they use `prepend()`.
         let separator = gtk::SeparatorMenuItem::new();
         popup.prepend(&separator);
-        let view_hex = gtk::RadioMenuItem::new_with_label(&[], "Hex");
+        let view_hex = gtk::RadioMenuItem::new_with_label("Hex");
         popup.prepend(&view_hex);
-        let group = view_hex.get_group();
-        let view_text = gtk::RadioMenuItem::new_with_label(&group, "Text");
+        let view_text = gtk::RadioMenuItem::new_with_label_from_widget(&view_hex, "Text");
         popup.prepend(&view_text);
         GLOBAL.with(|global| if let Some((ref ui, ..)) = *global.borrow() {
                         if ui.scrolled_hex_view.get_visible() {
