@@ -21,9 +21,10 @@ use clap::{Arg, App};
 use cairo::Context;
 use chrono::prelude::*;
 use gdk::prelude::*;
+use gdk::{EventMask, ModifierType};
 use glib::{signal_stop_emission_by_name, signal_handler_block, signal_handler_unblock};
 use gtk::prelude::*;
-use gtk::WindowExt;
+use gtk::DialogFlags;
 
 use gattii::*;
 
@@ -46,7 +47,7 @@ struct Ui {
     scrolled_hex_view: gtk::ScrolledWindow,
     text_buffer: gtk::TextBuffer,
     hex_buffer: gtk::TextBuffer,
-    file_button: gtk::ToggleButton,
+    send_button: gtk::ToggleButton,
     open_button: gtk::ToggleButton,
     save_button: gtk::ToggleButton,
     status_bar: gtk::Statusbar,
@@ -61,16 +62,16 @@ struct Ui {
     baud_map: HashMap<String, i32>,
     ports_dropdown: gtk::ComboBoxText,
     ports_map: HashMap<String, i32>,
-    text_buffer_insert_signal: u64,
-    hex_buffer_insert_signal: u64,
-    text_buffer_delete_signal: u64,
-    hex_buffer_delete_signal: u64,
-    open_button_clicked_signal: u64,
-    file_button_toggled_signal: u64,
-    save_button_toggled_signal: u64,
-    file_button_progress_icon: gtk::DrawingArea,
-    file_button_static_icon: gtk::Image,
-    ports_dropdown_changed_signal: u64,
+    text_buffer_insert_signal: glib::SignalHandlerId,
+    hex_buffer_insert_signal: glib::SignalHandlerId,
+    text_buffer_delete_signal: glib::SignalHandlerId,
+    hex_buffer_delete_signal: glib::SignalHandlerId,
+    open_button_clicked_signal: glib::SignalHandlerId,
+    send_button_toggled_signal: glib::SignalHandlerId,
+    save_button_toggled_signal: glib::SignalHandlerId,
+    send_button_progress_icon: gtk::DrawingArea,
+    send_button_static_icon: gtk::Image,
+    ports_dropdown_changed_signal: glib::SignalHandlerId,
 }
 
 struct State {
@@ -168,8 +169,6 @@ fn main() {
     }
 
     ui_init();
-
-    ui_connect();
 
     GLOBAL.with(|global| {
         if let Some((ref ui, _, _)) = *global.borrow() {
@@ -358,7 +357,7 @@ fn ui_init() {
     operations_icon.set_size_request(16, 16);
     // FIXME: Simplify the following line once gtk-rs#468 is resolved
     //        (https://github.com/gtk-rs/gtk/issues/468)
-    operations_icon.add_events((gdk::BUTTON_PRESS_MASK | gdk::BUTTON_RELEASE_MASK).bits() as i32);
+    operations_icon.add_events((EventMask::BUTTON_PRESS_MASK | EventMask::BUTTON_RELEASE_MASK).bits() as i32);
     operations_icon.connect_draw(|w, c| {
         GLOBAL.with(|global| {
             if let Some((.., ref state)) = *global.borrow() {
@@ -393,24 +392,24 @@ fn ui_init() {
     });
 
     // Add send file button
-    let send_file_button = gtk::ToggleButton::new();
-    send_file_button.set_tooltip_text("Send file");
-    let send_file_image = gtk::Image::new_from_file("resources/upload.svg");
-    send_file_button.set_image(&send_file_image);
-    send_file_button.set_sensitive(false);
-    let send_file_button_container = gtk::ToolItem::new();
-    send_file_button_container.add(&send_file_button);
-    toolbar.add(&send_file_button_container);
+    let send_button = gtk::ToggleButton::new();
+    send_button.set_tooltip_text("Send file");
+    let send_image = gtk::Image::new_from_file("resources/upload.svg");
+    send_button.set_image(&send_image);
+    send_button.set_sensitive(false);
+    let send_button_container = gtk::ToolItem::new();
+    send_button_container.add(&send_button);
+    toolbar.add(&send_button_container);
 
     // Add save file button
-    let save_file_button = gtk::ToggleButton::new();
-    save_file_button.set_tooltip_text("Log to file");
-    let save_file_image = gtk::Image::new_from_file("resources/download.svg");
-    save_file_button.set_image(&save_file_image);
-    save_file_button.set_sensitive(false);
-    let save_file_button_container = gtk::ToolItem::new();
-    save_file_button_container.add(&save_file_button);
-    toolbar.add(&save_file_button_container);
+    let save_button = gtk::ToggleButton::new();
+    save_button.set_tooltip_text("Log to file");
+    let save_image = gtk::Image::new_from_file("resources/download.svg");
+    save_button.set_image(&save_image);
+    save_button.set_sensitive(false);
+    let save_button_container = gtk::ToolItem::new();
+    save_button_container.add(&save_button);
+    toolbar.add(&save_button_container);
 
     // Create dual text buffers, one with ASCII text and the other with the hex equivalent. We also
     // Create an "end" text mark within the buffers that we can use to insert new text. This has
@@ -476,6 +475,241 @@ fn ui_init() {
                                                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     css_provider.load_from_path("resources/style.css").expect("Failed to load CSS stylesheet");
 
+    baud_dropdown.connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
+                                            GLOBAL.with(|global| {
+            if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                    Err(GeneralError::Parse(_)) => {
+                        error!("Invalid baud rate '{}' specified.", &baud_rate)
+                    }
+                    Err(GeneralError::Send(_)) => {
+                        error!("Error sending port_open command to child thread. \
+                                    Aborting.")
+                    }
+                    Ok(_) => (),
+                }
+            }
+        });
+    });
+
+    let ports_dropdown_changed_signal = ports_dropdown.connect_changed(
+        move |s| if let Some(port_name) =
+        s.get_active_text() {
+            GLOBAL.with(|global| {
+                if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    match serial_thread.send_port_change_port_cmd(port_name.clone()) {
+                        Err(GeneralError::Parse(_)) => {
+                            error!("Invalid port name '{}' specified.", &port_name)
+                        }
+                        Err(GeneralError::Send(_)) => {
+                            error!("Error sending change_port command to child thread. \
+                                        Aborting.")
+                        }
+                        Ok(_) => (),
+                    }
+                }
+            });
+    });
+
+    let open_button_clicked_signal = open_button.connect_clicked(move |s| {
+        if s.get_active() {
+            GLOBAL.with(|global| {
+                if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
+                    if let Some(port_name) = ui.ports_dropdown.get_active_text() {
+                        if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
+                            match serial_thread.send_port_open_cmd(port_name,
+                                                                    baud_rate.clone()) {
+                                Err(GeneralError::Parse(_)) => {
+                                    error!("Invalid baud rate '{}' specified.", &baud_rate)
+                                }
+                                Err(GeneralError::Send(_)) => {
+                                    error!("Error sending port_open command to child \
+                                            thread. Aborting.")
+                                }
+                                // After opening the port has succeeded, set the focus on
+                                // the text view so the user can start sending data
+                                // immediately (this also prevents ENTER from closing the
+                                // port, likely not what the user intends or expects).
+                                Ok(_) => ui.text_view.grab_focus(),
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            GLOBAL.with(|global| if let Some((ref ui, ref sthread, _)) = *global.borrow() {
+                    match sthread.send_port_close_cmd() {
+                        Err(GeneralError::Send(_)) => {
+                            error!("Error sending port_close command to child thread. \
+                                    Aborting.")
+                        }
+                        Err(_) | Ok(_) => (),
+                    }
+                    ui.send_button.set_image(&ui.send_button_static_icon);
+                });
+        }
+    });
+
+    // Connect send file selector button to callback. This is left as a
+    // separate function to reduce rightward drift.
+    let send_button_toggled_signal = send_button
+        .connect_toggled(send_button_connect_toggled);
+
+    // Connect log file selector button to callback. This is left as a
+    // separate function to reduce rightward drift.
+    let save_button_toggled_signal = save_button
+        .connect_toggled(save_button_connect_toggled);
+
+    // Configure the data bits callback
+    data_bits_scale.connect_value_changed(|s| {
+        let data_bits = match s.get_value() as u8 {
+            5 => DataBits::Five,
+            6 => DataBits::Six,
+            7 => DataBits::Seven,
+            8 => DataBits::Eight,
+            _ => unreachable!(),
+        };
+        GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+            match serial_thread.send_port_change_data_bits_cmd(data_bits) {
+                Err(GeneralError::Parse(_)) => {
+                    unreachable!();
+                }
+                Err(GeneralError::Send(_)) => {
+                    error!("Error sending data bits change command to child thread. \
+                            Aborting.")
+                }
+                Ok(_) => (),
+            }
+        });
+    });
+
+    // Configure the data bits callback
+    stop_bits_scale.connect_value_changed(|s| {
+        let stop_bits = match s.get_value() as u8 {
+            1 => StopBits::One,
+            2 => StopBits::Two,
+            _ => unreachable!(),
+        };
+        GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+            match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
+                Err(GeneralError::Parse(_)) => {
+                    unreachable!();
+                }
+                Err(GeneralError::Send(_)) => {
+                    error!("Error sending stop bits change command to child thread. \
+                            Aborting.")
+                }
+                Ok(_) => (),
+            }
+        });
+    });
+
+    // Configure the parity dropdown callback
+    parity_dropdown.connect_changed(|s| {
+        let parity = match s.get_active_text() {
+            Some(ref x) if x == "none" => Some(Parity::None),
+            Some(ref x) if x == "odd" => Some(Parity::Odd),
+            Some(ref x) if x == "even" => Some(Parity::Even),
+            Some(_) | None => unreachable!(),
+        };
+        if let Some(parity) = parity {
+            GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                match serial_thread.send_port_change_parity_cmd(parity) {
+                    Err(GeneralError::Parse(_)) => unreachable!(),
+                    Err(GeneralError::Send(_)) => {
+                        error!("Error sending parity change command \
+                            to child thread. Aborting.")
+                    }
+                    Ok(_) => (),
+                }
+            });
+        }
+    });
+
+    // Configure the flow control dropdown callback
+    flow_control_dropdown.connect_changed(|s| {
+        let flow_control = match s.get_active_text() {
+            Some(ref x) if x == "none" => Some(FlowControl::None),
+            Some(ref x) if x == "software" => Some(FlowControl::Software),
+            Some(ref x) if x == "hardware" => Some(FlowControl::Hardware),
+            Some(_) | None => unreachable!(),
+        };
+        if let Some(flow_control) = flow_control {
+            GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
+                    match serial_thread.send_port_change_flow_control_cmd(flow_control) {
+                        Err(GeneralError::Parse(_)) => {
+                            unreachable!();
+                        }
+                        Err(GeneralError::Send(_)) => {
+                            error!("Error sending flow control change \
+                                        command to child thread. Aborting.")
+                        }
+                        Ok(_) => (),
+                    }
+                });
+        }
+    });
+
+    // Configure the right-click menu for the both the text and hex view widgets
+    text_view.connect_populate_popup(view_populate_popup);
+    hex_view.connect_populate_popup(view_populate_popup);
+
+    text_view.connect_key_press_event(|_, k| {
+        GLOBAL.with(|global| {
+            if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
+                if state.connected_port.is_some() {
+                    let mut cmd: Option<(u8, char)> = None;
+                    // Check for a backspace with no modifier keys
+                    if k.get_state().is_empty() &&
+                        k.get_keyval() == gdk::enums::key::BackSpace {
+                        cmd = Some((8, 'H'));
+                    }
+                    // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
+                    else if k.get_state().contains(ModifierType::CONTROL_MASK) {
+                        if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
+                            cmd = match key {
+                                '@' => Some((0, key)),
+                                'A'...'Z' => Some((1 + key as u8 - b'A', key)),
+                                '[' => Some((27, key)),
+                                '\\' => Some((28, key)),
+                                ']' => Some((29, key)),
+                                '^' => Some((30, key)),
+                                '_' => Some((31, key)),
+                                _ => None,
+                            };
+                        }
+                    }
+                    if let Some((cmd, debug_char)) = cmd {
+                        info!("Sending Ctrl-{}", debug_char);
+                        match serial_thread.send_port_data_cmd(&[cmd as u8]) {
+                            Err(GeneralError::Send(_)) => {
+                                error!("Error sending data command to child thread. \
+                                        Aborting.")
+                            }
+                            Err(e) => error!("{:?}", e),
+                            Ok(_) => (),
+                        }
+                    }
+                }
+            }
+        });
+        Inhibit(false)
+    });
+
+    // Allow the user to send data by typing/pasting it in either buffer
+    let text_buffer_insert_signal = text_buffer.connect_insert_text(buffer_insert);
+    let hex_buffer_insert_signal = hex_buffer.connect_insert_text(buffer_insert);
+
+    // Disable deletion of characters within the textview
+    let text_buffer_delete_signal = text_buffer.connect_delete_range(move |b, _, _| {
+        signal_stop_emission_by_name(b, "delete-range");
+    });
+    let hex_buffer_delete_signal =
+        hex_buffer.connect_delete_range(move |b, _, _| {
+                                                signal_stop_emission_by_name(b,
+                                                                            "delete-range");
+                                           });
+
     // Set up channels for communicating with the port thread.
     let ui = Ui {
         window: window.clone(),
@@ -485,9 +719,9 @@ fn ui_init() {
         scrolled_hex_view: scrolled_hex_view.clone(),
         text_buffer: text_buffer.clone(),
         hex_buffer: hex_buffer.clone(),
-        file_button: send_file_button.clone(),
+        send_button: send_button.clone(),
         open_button: open_button.clone(),
-        save_button: save_file_button.clone(),
+        save_button: save_button.clone(),
         status_bar: status_bar.clone(),
         status_bar_contexts: context_map,
         data_bits_scale: data_bits_scale.clone(),
@@ -500,16 +734,16 @@ fn ui_init() {
         baud_map: baud_dropdown_map,
         ports_dropdown: ports_dropdown.clone(),
         ports_map: ports_dropdown_map,
-        text_buffer_insert_signal: 0,
-        hex_buffer_insert_signal: 0,
-        text_buffer_delete_signal: 0,
-        hex_buffer_delete_signal: 0,
-        open_button_clicked_signal: 0,
-        file_button_toggled_signal: 0,
-        save_button_toggled_signal: 0,
-        file_button_progress_icon: operations_icon,
-        file_button_static_icon: send_file_image,
-        ports_dropdown_changed_signal: 0,
+        text_buffer_insert_signal: text_buffer_insert_signal,
+        hex_buffer_insert_signal: hex_buffer_insert_signal,
+        text_buffer_delete_signal: text_buffer_delete_signal,
+        hex_buffer_delete_signal: hex_buffer_delete_signal,
+        open_button_clicked_signal: open_button_clicked_signal,
+        send_button_toggled_signal: send_button_toggled_signal,
+        save_button_toggled_signal: save_button_toggled_signal,
+        send_button_progress_icon: operations_icon,
+        send_button_static_icon: send_image,
+        ports_dropdown_changed_signal: ports_dropdown_changed_signal,
     };
     let state = State {
         connected_port: None,
@@ -520,248 +754,6 @@ fn ui_init() {
                     *global.borrow_mut() =
                         Some((ui, SerialThread::new(|| { glib::idle_add(receive); }), state));
                 });
-}
-
-fn ui_connect() {
-
-    GLOBAL.with(|global| {
-        if let Some((ref mut ui, _, _)) = *global.borrow_mut() {
-            ui.baud_dropdown.connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
-                                                 GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
-                            Err(GeneralError::Parse(_)) => {
-                                error!("Invalid baud rate '{}' specified.", &baud_rate)
-                            }
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending port_open command to child thread. \
-                                            Aborting.")
-                            }
-                            Ok(_) => (),
-                        }
-                    }
-                });
-            });
-
-            ui.ports_dropdown_changed_signal = ui.ports_dropdown.connect_changed(
-                move |s| if let Some(port_name) =
-                s.get_active_text() {
-                    GLOBAL.with(|global| {
-                        if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_port_cmd(port_name.clone()) {
-                                Err(GeneralError::Parse(_)) => {
-                                    error!("Invalid port name '{}' specified.", &port_name)
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending change_port command to child thread. \
-                                                Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        }
-                    });
-            });
-
-            ui.open_button_clicked_signal = ui.open_button.connect_clicked(move |s| {
-                if s.get_active() {
-                    GLOBAL.with(|global| {
-                        if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
-                            if let Some(port_name) = ui.ports_dropdown.get_active_text() {
-                                if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
-                                    match serial_thread.send_port_open_cmd(port_name,
-                                                                           baud_rate.clone()) {
-                                        Err(GeneralError::Parse(_)) => {
-                                            error!("Invalid baud rate '{}' specified.", &baud_rate)
-                                        }
-                                        Err(GeneralError::Send(_)) => {
-                                            error!("Error sending port_open command to child \
-                                                    thread. Aborting.")
-                                        }
-                                        // After opening the port has succeeded, set the focus on
-                                        // the text view so the user can start sending data
-                                        // immediately (this also prevents ENTER from closing the
-                                        // port, likely not what the user intends or expects).
-                                        Ok(_) => ui.text_view.grab_focus(),
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    GLOBAL.with(|global| if let Some((ref ui, ref sthread, _)) = *global.borrow() {
-                            match sthread.send_port_close_cmd() {
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending port_close command to child thread. \
-                                            Aborting.")
-                                }
-                                Err(_) | Ok(_) => (),
-                            }
-                            ui.file_button.set_image(&ui.file_button_static_icon);
-                        });
-                }
-            });
-
-            // Connect send file selector button to callback. This is left as a
-            // separate function to reduce rightward drift.
-            ui.file_button_toggled_signal = ui.file_button
-                .connect_toggled(file_button_connect_toggled);
-
-            // Connect log file selector button to callback. This is left as a
-            // separate function to reduce rightward drift.
-            ui.save_button_toggled_signal = ui.save_button
-                .connect_toggled(save_button_connect_toggled);
-
-            // Configure the data bits callback
-            ui.data_bits_scale.connect_value_changed(|s| {
-                let data_bits = match s.get_value() as u8 {
-                    5 => DataBits::Five,
-                    6 => DataBits::Six,
-                    7 => DataBits::Seven,
-                    8 => DataBits::Eight,
-                    _ => unreachable!(),
-                };
-                GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_change_data_bits_cmd(data_bits) {
-                        Err(GeneralError::Parse(_)) => {
-                            unreachable!();
-                        }
-                        Err(GeneralError::Send(_)) => {
-                            error!("Error sending data bits change command to child thread. \
-                                    Aborting.")
-                        }
-                        Ok(_) => (),
-                    }
-                });
-            });
-
-            // Configure the data bits callback
-            ui.stop_bits_scale.connect_value_changed(|s| {
-                let stop_bits = match s.get_value() as u8 {
-                    1 => StopBits::One,
-                    2 => StopBits::Two,
-                    _ => unreachable!(),
-                };
-                GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_change_stop_bits_cmd(stop_bits) {
-                        Err(GeneralError::Parse(_)) => {
-                            unreachable!();
-                        }
-                        Err(GeneralError::Send(_)) => {
-                            error!("Error sending stop bits change command to child thread. \
-                                    Aborting.")
-                        }
-                        Ok(_) => (),
-                    }
-                });
-            });
-
-            // Configure the parity dropdown callback
-            ui.parity_dropdown.connect_changed(|s| {
-                let parity = match s.get_active_text() {
-                    Some(ref x) if x == "none" => Some(Parity::None),
-                    Some(ref x) if x == "odd" => Some(Parity::Odd),
-                    Some(ref x) if x == "even" => Some(Parity::Even),
-                    Some(_) | None => unreachable!(),
-                };
-                if let Some(parity) = parity {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                        match serial_thread.send_port_change_parity_cmd(parity) {
-                            Err(GeneralError::Parse(_)) => unreachable!(),
-                            Err(GeneralError::Send(_)) => {
-                                error!("Error sending parity change command \
-                                  to child thread. Aborting.")
-                            }
-                            Ok(_) => (),
-                        }
-                    });
-                }
-            });
-
-            // Configure the flow control dropdown callback
-            ui.flow_control_dropdown.connect_changed(|s| {
-                let flow_control = match s.get_active_text() {
-                    Some(ref x) if x == "none" => Some(FlowControl::None),
-                    Some(ref x) if x == "software" => Some(FlowControl::Software),
-                    Some(ref x) if x == "hardware" => Some(FlowControl::Hardware),
-                    Some(_) | None => unreachable!(),
-                };
-                if let Some(flow_control) = flow_control {
-                    GLOBAL.with(|global| if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                            match serial_thread.send_port_change_flow_control_cmd(flow_control) {
-                                Err(GeneralError::Parse(_)) => {
-                                    unreachable!();
-                                }
-                                Err(GeneralError::Send(_)) => {
-                                    error!("Error sending flow control change \
-                                              command to child thread. Aborting.")
-                                }
-                                Ok(_) => (),
-                            }
-                        });
-                }
-            });
-
-            // Configure the right-click menu for the both the text and hex view widgets
-            ui.text_view.connect_populate_popup(view_populate_popup);
-            ui.hex_view.connect_populate_popup(view_populate_popup);
-
-            ui.text_view.connect_key_press_event(|_, k| {
-                GLOBAL.with(|global| {
-                    if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
-                        if state.connected_port.is_some() {
-                            let mut cmd: Option<(u8, char)> = None;
-                            // Check for a backspace with no modifier keys
-                            if k.get_state().is_empty() &&
-                               k.get_keyval() == gdk::enums::key::BackSpace {
-                                cmd = Some((8, 'H'));
-                            }
-                            // Check for @, A-Z, [, \, ], ^, and _ with CTRL pressed
-                            else if k.get_state().contains(gdk::CONTROL_MASK) {
-                                if let Some(key) = gdk::keyval_to_unicode(k.get_keyval()) {
-                                    cmd = match key {
-                                        '@' => Some((0, key)),
-                                        'A'...'Z' => Some((1 + key as u8 - b'A', key)),
-                                        '[' => Some((27, key)),
-                                        '\\' => Some((28, key)),
-                                        ']' => Some((29, key)),
-                                        '^' => Some((30, key)),
-                                        '_' => Some((31, key)),
-                                        _ => None,
-                                    };
-                                }
-                            }
-                            if let Some((cmd, debug_char)) = cmd {
-                                info!("Sending Ctrl-{}", debug_char);
-                                match serial_thread.send_port_data_cmd(&[cmd as u8]) {
-                                    Err(GeneralError::Send(_)) => {
-                                        error!("Error sending data command to child thread. \
-                                                Aborting.")
-                                    }
-                                    Err(e) => error!("{:?}", e),
-                                    Ok(_) => (),
-                                }
-                            }
-                        }
-                    }
-                });
-                Inhibit(false)
-            });
-
-            // Allow the user to send data by typing/pasting it in either buffer
-            ui.text_buffer_insert_signal = ui.text_buffer.connect_insert_text(buffer_insert);
-            ui.hex_buffer_insert_signal = ui.hex_buffer.connect_insert_text(buffer_insert);
-
-            // Disable deletion of characters within the textview
-            ui.text_buffer_delete_signal = ui.text_buffer.connect_delete_range(move |b, _, _| {
-                signal_stop_emission_by_name(b, "delete-range");
-            });
-            ui.hex_buffer_delete_signal =
-                ui.hex_buffer.connect_delete_range(move |b, _, _| {
-                                                       signal_stop_emission_by_name(b,
-                                                                                    "delete-range");
-                                                   });
-        }
-    });
 }
 
 fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
@@ -949,16 +941,16 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
                             // In order to clear the buffer we need to
                             // disable the insert-text and delete-range
                             // signal handlers.
-                            signal_handler_block(&ui.text_buffer, ui.text_buffer_insert_signal);
-                            signal_handler_block(&ui.text_buffer, ui.text_buffer_delete_signal);
+                            signal_handler_block(&ui.text_buffer, &ui.text_buffer_insert_signal);
+                            signal_handler_block(&ui.text_buffer, &ui.text_buffer_delete_signal);
                             ui.text_buffer.set_text("");
-                            signal_handler_unblock(&ui.text_buffer, ui.text_buffer_delete_signal);
-                            signal_handler_unblock(&ui.text_buffer, ui.text_buffer_insert_signal);
-                            signal_handler_block(&ui.hex_buffer, ui.hex_buffer_insert_signal);
-                            signal_handler_block(&ui.hex_buffer, ui.hex_buffer_delete_signal);
+                            signal_handler_unblock(&ui.text_buffer, &ui.text_buffer_delete_signal);
+                            signal_handler_unblock(&ui.text_buffer, &ui.text_buffer_insert_signal);
+                            signal_handler_block(&ui.hex_buffer, &ui.hex_buffer_insert_signal);
+                            signal_handler_block(&ui.hex_buffer, &ui.hex_buffer_delete_signal);
                             ui.hex_buffer.set_text("");
-                            signal_handler_unblock(&ui.hex_buffer, ui.hex_buffer_delete_signal);
-                            signal_handler_unblock(&ui.hex_buffer, ui.hex_buffer_insert_signal);
+                            signal_handler_unblock(&ui.hex_buffer, &ui.hex_buffer_delete_signal);
+                            signal_handler_unblock(&ui.hex_buffer, &ui.hex_buffer_insert_signal);
                         }
                     });
                 });
@@ -992,7 +984,7 @@ fn receive() -> glib::Continue {
             let view = &ui.text_view;
             let ascii_buf = &ui.text_buffer;
             let hex_buf = &ui.hex_buffer;
-            let f_button = &ui.file_button;
+            let f_button = &ui.send_button;
             let s_button = &ui.save_button;
             let o_button = &ui.open_button;
             match serial_thread.from_port_chan_rx.try_recv() {
@@ -1027,16 +1019,16 @@ fn receive() -> glib::Continue {
                     }
 
                     // Inserts data at the end
-                    signal_handler_block(hex_buf, ui.hex_buffer_insert_signal);
+                    signal_handler_block(hex_buf, &ui.hex_buffer_insert_signal);
                     hex_buf.insert(&mut iter, &String::from_utf8_lossy(&hex_data));
-                    signal_handler_unblock(hex_buf, ui.hex_buffer_insert_signal);
+                    signal_handler_unblock(hex_buf, &ui.hex_buffer_insert_signal);
 
                     // Add the text to the ASCII buffer
                     let mark = ascii_buf.get_mark("end").unwrap();
                     let mut iter = ascii_buf.get_iter_at_mark(&mark);
-                    signal_handler_block(ascii_buf, ui.text_buffer_insert_signal);
+                    signal_handler_block(ascii_buf, &ui.text_buffer_insert_signal);
                     ascii_buf.insert(&mut iter, &String::from_utf8_lossy(&data));
-                    signal_handler_unblock(ascii_buf, ui.text_buffer_insert_signal);
+                    signal_handler_unblock(ascii_buf, &ui.text_buffer_insert_signal);
 
                     // Keep the textview scrolled to the bottom. This is indepenent of which buffer
                     // is active, so we just need to do it once.
@@ -1048,13 +1040,13 @@ fn receive() -> glib::Continue {
                 }
                 Ok(SerialResponse::DisconnectSuccess) => {
                     f_button.set_sensitive(false);
-                    signal_handler_block(f_button, ui.file_button_toggled_signal);
+                    signal_handler_block(f_button, &ui.send_button_toggled_signal);
                     f_button.set_active(false);
-                    signal_handler_unblock(f_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(f_button, &ui.send_button_toggled_signal);
                     s_button.set_sensitive(false);
-                    signal_handler_block(s_button, ui.save_button_toggled_signal);
+                    signal_handler_block(s_button, &ui.save_button_toggled_signal);
                     s_button.set_active(false);
-                    signal_handler_unblock(s_button, ui.save_button_toggled_signal);
+                    signal_handler_unblock(s_button, &ui.save_button_toggled_signal);
                     state.connected_port = None;
                     log_status(&ui, StatusContext::PortOperation, "Port closed");
                 }
@@ -1068,9 +1060,9 @@ fn receive() -> glib::Continue {
                 Ok(SerialResponse::OpenPortError(s)) => {
                     f_button.set_sensitive(false);
                     s_button.set_sensitive(false);
-                    signal_handler_block(o_button, ui.open_button_clicked_signal);
+                    signal_handler_block(o_button, &ui.open_button_clicked_signal);
                     o_button.set_active(false);
-                    signal_handler_unblock(o_button, ui.open_button_clicked_signal);
+                    signal_handler_unblock(o_button, &ui.open_button_clicked_signal);
 
                     state.connected_port = None;
 
@@ -1091,15 +1083,15 @@ fn receive() -> glib::Continue {
                         ui.ports_dropdown.set_sensitive(true);
                         o_button.set_sensitive(true);
                     }
-                    signal_handler_block(&ui.ports_dropdown, ui.ports_dropdown_changed_signal);
+                    signal_handler_block(&ui.ports_dropdown, &ui.ports_dropdown_changed_signal);
                     ui.ports_dropdown.set_active(0);
                     signal_handler_unblock(&ui.ports_dropdown,
-                                           ui.ports_dropdown_changed_signal);
+                                           &ui.ports_dropdown_changed_signal);
 
                     let s = format!("Error opening port ({})", s);
                     log_status(&ui, StatusContext::PortOperation, &s);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         DialogFlags::DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
                                                          &s);
@@ -1109,32 +1101,32 @@ fn receive() -> glib::Continue {
                     dialog.show_all();
                 }
                 Ok(SerialResponse::SendingFileComplete) => {
-                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_block(&ui.send_button, &ui.send_button_toggled_signal);
                     f_button.set_active(false);
-                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(&ui.send_button, &ui.send_button_toggled_signal);
                     view.set_editable(true);
                     log_status(&ui, StatusContext::FileOperation, "Sending file finished");
-                    f_button.set_image(&ui.file_button_static_icon);
+                    f_button.set_image(&ui.send_button_static_icon);
                 }
                 Ok(SerialResponse::SendingFileCanceled) => {
                     info!("Sending file complete");
-                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_block(&ui.send_button, &ui.send_button_toggled_signal);
                     f_button.set_active(false);
-                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(&ui.send_button, &ui.send_button_toggled_signal);
                     view.set_editable(true);
                     log_status(&ui, StatusContext::FileOperation, "Sending file canceled");
-                    f_button.set_image(&ui.file_button_static_icon);
+                    f_button.set_image(&ui.send_button_static_icon);
                 }
                 Ok(SerialResponse::SendingFileError(_)) => {
-                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_block(&ui.send_button, &ui.send_button_toggled_signal);
                     f_button.set_active(false);
-                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(&ui.send_button, &ui.send_button_toggled_signal);
                     view.set_editable(true);
-                    f_button.set_image(&ui.file_button_static_icon);
+                    f_button.set_image(&ui.send_button_static_icon);
                     let s = "Error sending file";
                     log_status(&ui, StatusContext::FileOperation, &s);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         DialogFlags::DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
                                                          &s);
@@ -1144,13 +1136,13 @@ fn receive() -> glib::Continue {
                     dialog.show_all();
                 }
                 Ok(SerialResponse::SendingFileStarted) => {
-                    f_button.set_image(&ui.file_button_progress_icon);
+                    f_button.set_image(&ui.send_button_progress_icon);
                     state.send_file_percentage = 0;
                 }
                 Ok(SerialResponse::SendingFileProgress(i)) => {
                     info!("Sending file {}% complete", i);
                     state.send_file_percentage = i;
-                    ui.file_button_progress_icon.queue_draw();
+                    ui.send_button_progress_icon.queue_draw();
                 }
                 Ok(SerialResponse::UnexpectedDisconnection(ports)) => {
                     // Update the port listing and other UI elements
@@ -1169,21 +1161,21 @@ fn receive() -> glib::Continue {
                         o_button.set_sensitive(true);
                     }
                     signal_handler_block(&ui.ports_dropdown,
-                                         ui.ports_dropdown_changed_signal);
+                                         &ui.ports_dropdown_changed_signal);
                     ui.ports_dropdown.set_active(0);
                     signal_handler_unblock(&ui.ports_dropdown,
-                                           ui.ports_dropdown_changed_signal);
+                                           &ui.ports_dropdown_changed_signal);
                     f_button.set_sensitive(false);
-                    signal_handler_block(f_button, ui.file_button_toggled_signal);
+                    signal_handler_block(f_button, &ui.send_button_toggled_signal);
                     f_button.set_active(false);
-                    signal_handler_unblock(f_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(f_button, &ui.send_button_toggled_signal);
                     s_button.set_sensitive(false);
-                    signal_handler_block(s_button, ui.save_button_toggled_signal);
+                    signal_handler_block(s_button, &ui.save_button_toggled_signal);
                     s_button.set_active(false);
-                    signal_handler_unblock(s_button, ui.save_button_toggled_signal);
-                    signal_handler_block(o_button, ui.open_button_clicked_signal);
+                    signal_handler_unblock(s_button, &ui.save_button_toggled_signal);
+                    signal_handler_block(o_button, &ui.open_button_clicked_signal);
                     o_button.set_active(false);
-                    signal_handler_unblock(o_button, ui.open_button_clicked_signal);
+                    signal_handler_unblock(o_button, &ui.open_button_clicked_signal);
 
                     // Save the current port name and then update internal state
                     let name = state.connected_port.take().expect("A port should be connected here");
@@ -1192,8 +1184,8 @@ fn receive() -> glib::Continue {
                     // Warn the user as to what happened
                     log_status(&ui, StatusContext::PortOperation, &s);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                                                         gtk::DIALOG_DESTROY_WITH_PARENT |
-                                                         gtk::DIALOG_MODAL,
+                                                         DialogFlags::DESTROY_WITH_PARENT |
+                                                         DialogFlags::MODAL,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
                                                          &s);
@@ -1206,7 +1198,7 @@ fn receive() -> glib::Continue {
                 Ok(SerialResponse::LogToFileError(_)) => {
                     s_button.set_active(false);
                     let dialog = gtk::MessageDialog::new(Some(window),
-                                                         gtk::DIALOG_DESTROY_WITH_PARENT,
+                                                         DialogFlags::DESTROY_WITH_PARENT,
                                                          gtk::MessageType::Error,
                                                          gtk::ButtonsType::Ok,
                                                          "Error logging to file");
@@ -1263,14 +1255,14 @@ fn receive() -> glib::Continue {
                             ui.ports_dropdown.set_sensitive(true);
                             o_button.set_sensitive(true);
                         }
-                        signal_handler_block(&ui.ports_dropdown, ui.ports_dropdown_changed_signal);
+                        signal_handler_block(&ui.ports_dropdown, &ui.ports_dropdown_changed_signal);
                         if let Some(p) = current_port {
                             ui.ports_dropdown.set_active(ui.ports_map[&p]);
                         } else {
                             ui.ports_dropdown.set_active(0);
                         }
                         signal_handler_unblock(&ui.ports_dropdown,
-                                               ui.ports_dropdown_changed_signal);
+                                               &ui.ports_dropdown_changed_signal);
                     }
                 }
                 Err(_) => (),
@@ -1286,8 +1278,8 @@ fn start_file_send(filename: PathBuf) {
             match serial_thread.send_port_file_cmd(filename.clone()) {
                 Err(_) => {
                     error!("Error sending port_file command to child thread. Aborting.");
-                    ui.file_button.set_sensitive(true);
-                    ui.file_button.set_active(false);
+                    ui.send_button.set_sensitive(true);
+                    ui.send_button.set_active(false);
                     log_status(&ui,
                                StatusContext::FileOperation,
                                "Error trying to send file");
@@ -1306,7 +1298,7 @@ fn start_file_send(filename: PathBuf) {
     });
 }
 
-fn file_button_connect_toggled(b: &gtk::ToggleButton) {
+fn send_button_connect_toggled(b: &gtk::ToggleButton) {
     GLOBAL.with(|global| {
         if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
             let window = &ui.window;
@@ -1323,9 +1315,9 @@ fn file_button_connect_toggled(b: &gtk::ToggleButton) {
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file open dialog
-                    signal_handler_block(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_block(&ui.send_button, &ui.send_button_toggled_signal);
                     b.set_active(false);
-                    signal_handler_unblock(&ui.file_button, ui.file_button_toggled_signal);
+                    signal_handler_unblock(&ui.send_button, &ui.send_button_toggled_signal);
                 }
 
                 dialog.destroy();
@@ -1368,9 +1360,9 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
                 } else {
                     // Make the button look inactive if the user canceled the
                     // file save dialog
-                    signal_handler_block(&ui.save_button, ui.save_button_toggled_signal);
+                    signal_handler_block(&ui.save_button, &ui.save_button_toggled_signal);
                     b.set_active(false);
-                    signal_handler_unblock(&ui.save_button, ui.save_button_toggled_signal);
+                    signal_handler_unblock(&ui.save_button, &ui.save_button_toggled_signal);
                 }
 
                 dialog.destroy();
