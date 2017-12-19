@@ -35,12 +35,19 @@ build:stable:
     - cargo build --verbose
 
 test:rustfmt:
-    image: "rust:latest"
+    image: "debian:stable-slim"
     stage: test
     allow_failure: true
     script:
+    - export RUST_ARCHIVE=rust-nightly-x86_64-unknown-linux-gnu.tar.gz
+    - export RUST_DOWNLOAD_URL=https://static.rust-lang.org/dist/$RUST_ARCHIVE
+    - curl -fsOSL $RUST_DOWNLOAD_URL
+    - curl -s $RUST_DOWNLOAD_URL.sha256 | sha256sum -c -
+    - tar -xzf $RUST_ARCHIVE --strip-components=1
+    - ./install.sh
     - cargo update
-    - cargo install rustfmt
+    - cargo build --verbose
+    - cargo install rustfmt-nightly
     - cargo fmt -- --write-mode=diff
 
 test:clippy:
