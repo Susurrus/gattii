@@ -53,14 +53,14 @@ environment:
       target: i686-pc-windows-gnu
       configuration: Debug
       BITS: 32
-  # Nightly 64-bit GNU
-    - channel: nightly
+  # 1.20 64-bit GNU
+    - channel: 1.20.0
       platform: x64
       target: x86_64-pc-windows-gnu
       configuration: Debug
       BITS: 64
-  # Nightly 32-bit GNU
-    - channel: nightly
+  # 1.20 32-bit GNU
+    - channel: 1.20.0
       platform: x86
       target: i686-pc-windows-gnu
       configuration: Debug
@@ -79,15 +79,6 @@ environment:
       configuration: Release
       BITS: 32
       PACKAGE: true
-
-### Allowed failures ###
-
-# See Appveyor documentation for specific details. In short, place any channel or targets you wish
-# to allow build failures on (usually nightly at least is a wise choice). This will prevent a build
-# or test failure in the matching channels/targets from failing the entire build.
-matrix:
-  allow_failures:
-    - channel: nightly
 
 ## Install Script ##
 
