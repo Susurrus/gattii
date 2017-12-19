@@ -127,8 +127,8 @@ impl SerialThread {
                                     .unwrap();
                             }
                             Err(serialport::Error {kind: serialport::ErrorKind::NoDevice, ..}) => {
-                                let err_str = String::from(format!("Port '{}' is already in use \
-                                                                    or doesn't exist", &name));
+                                let err_str = format!("Port '{}' is already in use or doesn't \
+                                                       exist", &name);
                                 let error = SerialResponse::OpenPortError(err_str);
                                 from_port_chan_tx.send(error).unwrap();
                             }
@@ -190,8 +190,7 @@ impl SerialThread {
                                 }
                                 Err(_) => {
                                     port = None;
-                                    let err_str = String::from(format!("Failed to open port '{}'",
-                                                                       &name));
+                                    let err_str = format!("Failed to open port '{}'", &name);
                                     let error = SerialResponse::OpenPortError(err_str);
                                     from_port_chan_tx.send(error).unwrap();
                                     callback();
@@ -381,10 +380,9 @@ impl SerialThread {
                             SerialResponse::PortsFound(ports)
                         }
                     };
-                    match message {
-                        SerialResponse::UnexpectedDisconnection(_) => port = None,
-                        _ => (),
-                    };
+                    if let SerialResponse::UnexpectedDisconnection(_) = message {
+                        port = None;
+                    }
                     from_port_chan_tx.send(message).unwrap();
                     callback();
                 }
