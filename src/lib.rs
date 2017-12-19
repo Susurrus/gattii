@@ -114,7 +114,7 @@ impl SerialThread {
                 // First check if we have any incoming commands
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                        settings.baud_rate = BaudRate::from_speed(baud as usize);
+                        settings.baud_rate = BaudRate::from(baud);
                         info!("Connecting to {} at {} with settings {:?}",
                               &name,
                               &baud,
@@ -141,7 +141,7 @@ impl SerialThread {
                     }
                     Ok(SerialCommand::ChangeBaud(baud)) => {
                         info!("Changing baud to {}", baud);
-                        let baud_rate = BaudRate::from_speed(baud as usize);
+                        let baud_rate = BaudRate::from(baud);
                         settings.baud_rate = baud_rate;
                         if let Some(ref mut p) = port {
                             p.set_baud_rate(baud_rate).unwrap();
@@ -303,7 +303,7 @@ impl SerialThread {
                     // Write 10ms of data at a time to account for loop time
                     // variation
                     if last_send_time.elapsed().subsec_nanos() > loop_time as u32 * 1_000_000 {
-                        let baud: u32 = p.baud_rate().unwrap().speed() as u32;
+                        let baud: u32 = p.baud_rate().unwrap().into();
                         let tx_data_len = baud as usize / byte_as_serial_bits / (1000 / loop_time);
                         if let Some(ref mut file) = read_file {
                             debug!("Reading {} bytes", tx_data_len);
