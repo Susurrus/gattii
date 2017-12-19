@@ -1,15 +1,15 @@
 language: rust
 
+cache: cargo
+
 os: osx
 
 rust:
-  - nightly
+  - 1.20.0
   - stable
 
 matrix:
   fast_finish: true
-  allow_failures:
-    - rust: nightly
 
 before_install:
   - brew update
