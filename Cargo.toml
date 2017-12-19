@@ -5,7 +5,7 @@ authors = ["Bryant Mairs <bryant@mai.rs>"]
 categories = ["hardware-support"]
 keywords = ["serial", "hardware", "system", "RS232", "terminal"]
 license = "GPL-3.0"
-readme = "README.rst"
+readme = "README.md"
 repository = "https://gitlab.com/susurrus/gattii"
 description = "Cross platform GUI (GTK-based) serial terminal"
 

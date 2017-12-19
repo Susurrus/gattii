@@ -81,7 +81,7 @@ package:
       - resources
       - gattii
       - LICENSE.txt
-      - README.rst
+      - README.md
       name: "$CI_BUILD_REF_NAME"
     stage: package
     script:

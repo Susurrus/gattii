@@ -135,7 +135,7 @@ after_build:
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip -i@dlls.txt )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip %APPVEYOR_BUILD_FOLDER%\target\release\gattii.exe )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip resources )
-  - if "%PACKAGE%"=="true" ( 7z a gattii.zip README.rst )
+  - if "%PACKAGE%"=="true" ( 7z a gattii.zip README.md )
   - if "%PACKAGE%"=="true" ( 7z a gattii.zip LICENSE.txt )
 
 artifacts:
