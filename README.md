@@ -13,6 +13,13 @@ Gattii is a serial terminal emulator that allows one to use a serial port for tr
 [Rust]: https://www.rust-lang.org
 [Realterm]: http://realterm.sourceforge.net/
 
+The canonical repository for this crate is on [GitLab](https://gitlab.com/susurrus/gattii),
+but it is mirrored on GitHub purely for testing via Travis CI. To report any issues or contribute
+code, please do so using through the GitLab repository.
+
+Etymology
+=========
+
 The name Gattii refers to Cryptococcus Gattii, which is named in solidarity with Rust itself, which was named after the rust family of fungi. I forgot why I originally chose this name, but now I like it so I'm just gonna keep it.
 
 Screenshots
