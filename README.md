@@ -30,7 +30,7 @@ Screenshots
 Functionality
 =============
 
-* Enumerate ports (except on Mac)
+* Enumerate ports
 * Easily modify settings/change ports
 * Send file
 * Log to file
