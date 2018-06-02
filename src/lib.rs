@@ -114,7 +114,7 @@ impl SerialThread {
                 // First check if we have any incoming commands
                 match to_port_chan_rx.try_recv() {
                     Ok(SerialCommand::ConnectToPort { name, baud }) => {
-                        settings.baud_rate = BaudRate::from(baud);
+                        settings.baud_rate = baud;
                         info!("Connecting to {} at {} with settings {:?}",
                               &name,
                               &baud,
@@ -141,10 +141,9 @@ impl SerialThread {
                     }
                     Ok(SerialCommand::ChangeBaud(baud)) => {
                         info!("Changing baud to {}", baud);
-                        let baud_rate = BaudRate::from(baud);
-                        settings.baud_rate = baud_rate;
+                        settings.baud_rate = baud;
                         if let Some(ref mut p) = port {
-                            p.set_baud_rate(baud_rate).unwrap();
+                            p.set_baud_rate(baud).unwrap();
                         }
                     }
                     Ok(SerialCommand::ChangeDataBits(data_bits)) => {
@@ -367,7 +366,7 @@ impl SerialThread {
                     // Check if our port was disconnected
                     let message = {
                         if let Some(ref mut p) = port {
-                            if let Some(name) = p.port_name() {
+                            if let Some(name) = p.name() {
                                 if ports.binary_search(&name).is_err() {
                                     SerialResponse::UnexpectedDisconnection(ports)
                                 } else {
