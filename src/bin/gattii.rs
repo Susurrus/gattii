@@ -114,7 +114,7 @@ thread_local!(
 
 fn main() {
     // Initialize logging
-    env_logger::init().expect("Failed to initialize logging");
+    env_logger::init();
 
     // Parse command-line arguments
     let matches = App::new("Gattii")
