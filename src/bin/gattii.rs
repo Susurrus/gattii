@@ -277,9 +277,9 @@ fn ui_init() {
     port_settings_button.set_popover(Some(&port_settings_popover));
     let popover_container = gtk::Grid::new();
     popover_container.set_margin_top(10);
-    popover_container.set_margin_right(10);
+    popover_container.set_margin_end(10);
     popover_container.set_margin_bottom(10);
-    popover_container.set_margin_left(10);
+    popover_container.set_margin_start(10);
     popover_container.set_row_spacing(10);
     popover_container.set_column_spacing(10);
     let data_bits_label = gtk::Label::new("Data bits:");
@@ -962,7 +962,7 @@ fn view_populate_popup(text_view: &gtk::TextView, popup: &gtk::Widget) {
     }
 }
 
-fn buffer_insert(textbuffer: &gtk::TextBuffer, _: &gtk::TextIter, text: &str) {
+fn buffer_insert(textbuffer: &gtk::TextBuffer, _: &mut gtk::TextIter, text: &str) {
     GLOBAL.with(|global| if let Some((_, ref serial_thread, ref state)) = *global.borrow() {
         let text = text.replace("\n", &state.line_ending);
         debug!("Sending {:?}", &text);
