@@ -1382,7 +1382,7 @@ fn save_button_connect_toggled(b: &gtk::ToggleButton) {
 /// Log messages to the status bar using the specific status context.
 fn log_status(ui: &Ui, context: StatusContext, message: &str) {
     let context_id = ui.status_bar_contexts.get(&context).unwrap();
-    let timestamp = UTC::now().format("%Y-%m-%d %H:%M:%S");
+    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S");
     let formatted_message = format!("[{}]: {}", timestamp, message);
     ui.status_bar.push(*context_id, &formatted_message);
 }
