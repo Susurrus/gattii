@@ -45,7 +45,7 @@ The only tier-1 platform for this is Linux x64, as that's what I develop and tes
 Building
 ========
 
-1. Install Rust stable using [rustup](https://www.rustup.rs/) (Requires Rust 1.26 or later)
+1. Install Rust stable using [rustup](https://www.rustup.rs/) (Requires Rust 1.27 or later)
 2. Install library requirements:
     * [gtk (3.14+)](http://gtk-rs.org/docs-src/requirements)
 3. Clone the main repository with `git clone https://gitlab.com/susurrus/gattii.git`
