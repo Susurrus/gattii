@@ -1026,8 +1026,14 @@ fn receive() -> glib::Continue {
                     // Add the text to the ASCII buffer
                     let mark = ascii_buf.get_mark("end").unwrap();
                     let mut iter = ascii_buf.get_iter_at_mark(&mark);
+                    const REPLACEMENT: &'static str = "\u{FFFD}";
                     signal_handler_block(ascii_buf, &ui.text_buffer_insert_signal);
-                    ascii_buf.insert(&mut iter, &String::from_utf8_lossy(&data));
+                    for c in &data {
+                        match c {
+                            0 => ascii_buf.insert(&mut iter, REPLACEMENT),
+                            _ => ascii_buf.insert(&mut iter, &String::from_utf8_lossy(&[*c])),
+                        }
+                    }
                     signal_handler_unblock(ascii_buf, &ui.text_buffer_insert_signal);
 
                     // Keep the textview scrolled to the bottom. This is indepenent of which buffer
