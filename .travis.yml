@@ -5,7 +5,7 @@ cache: cargo
 os: osx
 
 rust:
-  - 1.20.0
+  - 1.22.0
   - stable
 
 matrix:

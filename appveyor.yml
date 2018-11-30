@@ -53,14 +53,14 @@ environment:
       target: i686-pc-windows-gnu
       configuration: Debug
       BITS: 32
-  # 1.20 64-bit GNU
-    - channel: 1.20.0
+  # 1.22 64-bit GNU
+    - channel: 1.22.0
       platform: x64
       target: x86_64-pc-windows-gnu
       configuration: Debug
       BITS: 64
-  # 1.20 32-bit GNU
-    - channel: 1.20.0
+  # 1.22 32-bit GNU
+    - channel: 1.22.0
       platform: x86
       target: i686-pc-windows-gnu
       configuration: Debug
