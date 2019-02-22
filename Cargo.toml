@@ -20,11 +20,11 @@ doc = false
 
 [dependencies]
 clap = "2.22"
-cairo-rs = { version = "0.5", features = ["v1_12"] }
+cairo-rs = "0.6"
 chrono = "0.4"
 env_logger = "0.6"
-gdk = "0.9"
-glib = "0.6"
-gtk = { version = "0.5", features = ["v3_14"] }
+gdk = "0.10"
+glib = "0.7"
+gtk = "0.6"
 log = "0.4"
 serialport = "3.1"

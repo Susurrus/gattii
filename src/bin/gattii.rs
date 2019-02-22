@@ -55,13 +55,13 @@ struct Ui {
     data_bits_scale: gtk::Scale,
     stop_bits_scale: gtk::Scale,
     parity_dropdown: gtk::ComboBoxText,
-    parity_map: HashMap<String, i32>,
+    parity_map: HashMap<String, u32>,
     flow_control_dropdown: gtk::ComboBoxText,
-    flow_control_map: HashMap<String, i32>,
+    flow_control_map: HashMap<String, u32>,
     baud_dropdown: gtk::ComboBoxText,
-    baud_map: HashMap<String, i32>,
+    baud_map: HashMap<String, u32>,
     ports_dropdown: gtk::ComboBoxText,
-    ports_map: HashMap<String, i32>,
+    ports_map: HashMap<String, u32>,
     text_buffer_insert_signal: glib::SignalHandlerId,
     hex_buffer_insert_signal: glib::SignalHandlerId,
     text_buffer_delete_signal: glib::SignalHandlerId,
@@ -194,7 +194,7 @@ fn main() {
             }
             if let Some(serial_port_name) = matches.value_of("port") {
                 if let Some(ports_dropdown_index) = ui.ports_map.get(serial_port_name) {
-                    ui.ports_dropdown.set_active(*ports_dropdown_index as i32);
+                    ui.ports_dropdown.set_active(*ports_dropdown_index as u32);
                 } else {
                     error!("Invalid port name '{}' specified.", serial_port_name);
                     process::exit(ExitCode::ArgumentError as i32);
@@ -236,7 +236,7 @@ fn ui_init() {
     if let Ok(mut ports) = list_ports() {
         ports.sort();
         if !ports.is_empty() {
-            for (i, p) in (0i32..).zip(ports.into_iter()) {
+            for (i, p) in (0u32..).zip(ports.into_iter()) {
                 ports_dropdown.append(None, &p);
                 ports_dropdown_map.insert(p, i);
             }
@@ -259,7 +259,7 @@ fn ui_init() {
     let mut baud_dropdown_map = HashMap::new();
     let baud_dropdown = gtk::ComboBoxText::new();
     for (i, b) in BAUD_RATES.iter().enumerate() {
-        baud_dropdown_map.insert(b.to_string(), i as i32);
+        baud_dropdown_map.insert(b.to_string(), i as u32);
         baud_dropdown.append(None, b);
     }
     baud_dropdown.set_active(baud_dropdown_map[DEFAULT_BAUD]);
@@ -311,7 +311,7 @@ fn ui_init() {
     let parity_dropdown = gtk::ComboBoxText::new();
     let mut parity_dropdown_map = HashMap::new();
     for (i, b) in PARITIES.iter().enumerate() {
-        parity_dropdown_map.insert(b.to_string(), i as i32);
+        parity_dropdown_map.insert(b.to_string(), i as u32);
         parity_dropdown.append(None, b);
     }
     parity_dropdown.set_active(parity_dropdown_map[DEFAULT_PARITY]);
@@ -322,7 +322,7 @@ fn ui_init() {
     let flow_control_dropdown = gtk::ComboBoxText::new();
     let mut flow_control_dropdown_map = HashMap::new();
     for (i, b) in FLOW_CONTROLS.iter().enumerate() {
-        flow_control_dropdown_map.insert(b.to_string(), i as i32);
+        flow_control_dropdown_map.insert(b.to_string(), i as u32);
         flow_control_dropdown.append(None, b);
     }
     flow_control_dropdown
@@ -355,13 +355,11 @@ fn ui_init() {
     let operations_icon = gtk::DrawingArea::new();
     operations_icon.show();
     operations_icon.set_size_request(16, 16);
-    // FIXME: Simplify the following line once gtk-rs#468 is resolved
-    //        (https://github.com/gtk-rs/gtk/issues/468)
-    operations_icon.add_events((EventMask::BUTTON_PRESS_MASK | EventMask::BUTTON_RELEASE_MASK).bits() as i32);
+    operations_icon.add_events(EventMask::BUTTON_PRESS_MASK | EventMask::BUTTON_RELEASE_MASK);
     operations_icon.connect_draw(|w, c| {
         GLOBAL.with(|global| {
             if let Some((.., ref state)) = *global.borrow() {
-                let style_context = w.get_style_context().unwrap();
+                let style_context = w.get_style_context();
                 let foreground = style_context.get_color(w.get_state_flags());
                 let mut background = foreground.clone();
                 background.alpha *= 0.3;
@@ -415,11 +413,11 @@ fn ui_init() {
     // Create an "end" text mark within the buffers that we can use to insert new text. This has
     // a left-gravity so that inserting text at this mark will keep the mark at the end of it.
     // This is necessary because the "insert" mark gets moved when users select text.
-    let text_buffer = gtk::TextBuffer::new(None);
+    let text_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
     let mark = text_buffer.get_insert().unwrap();
     let iter = text_buffer.get_iter_at_mark(&mark);
     text_buffer.create_mark("end", &iter, false);
-    let hex_buffer = gtk::TextBuffer::new(None);
+    let hex_buffer = gtk::TextBuffer::new(None::<&gtk::TextTagTable>);
     let mark = hex_buffer.get_insert().unwrap();
     let iter = hex_buffer.get_iter_at_mark(&mark);
     hex_buffer.create_mark("end", &iter, false);
@@ -434,10 +432,10 @@ fn ui_init() {
 
     // Set up an auto-scrolling text view for each text view, hiding the hex one. Only one of these
     // should ever be shown at a time.
-    let scrolled_text_view = gtk::ScrolledWindow::new(None, None);
+    let scrolled_text_view = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
     scrolled_text_view.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scrolled_text_view.add(&text_view);
-    let scrolled_hex_view = gtk::ScrolledWindow::new(None, None);
+    let scrolled_hex_view = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
     scrolled_hex_view.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
     scrolled_hex_view.add(&hex_view);
 
@@ -478,7 +476,7 @@ fn ui_init() {
     baud_dropdown.connect_changed(move |s| if let Some(baud_rate) = s.get_active_text() {
                                             GLOBAL.with(|global| {
             if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                match serial_thread.send_port_change_baud_cmd(baud_rate.clone()) {
+                match serial_thread.send_port_change_baud_cmd(baud_rate.to_string()) {
                     Err(GeneralError::Parse(_)) => {
                         error!("Invalid baud rate '{}' specified.", &baud_rate)
                     }
@@ -497,7 +495,7 @@ fn ui_init() {
         s.get_active_text() {
             GLOBAL.with(|global| {
                 if let Some((_, ref serial_thread, _)) = *global.borrow() {
-                    match serial_thread.send_port_change_port_cmd(port_name.clone()) {
+                    match serial_thread.send_port_change_port_cmd(port_name.to_string()) {
                         Err(GeneralError::Parse(_)) => {
                             error!("Invalid port name '{}' specified.", &port_name)
                         }
@@ -517,8 +515,8 @@ fn ui_init() {
                 if let Some((ref ui, ref serial_thread, _)) = *global.borrow() {
                     if let Some(port_name) = ui.ports_dropdown.get_active_text() {
                         if let Some(baud_rate) = ui.baud_dropdown.get_active_text() {
-                            match serial_thread.send_port_open_cmd(port_name,
-                                                                    baud_rate.clone()) {
+                            match serial_thread.send_port_open_cmd(port_name.to_string(),
+                                                                   baud_rate.to_string()) {
                                 Err(GeneralError::Parse(_)) => {
                                     error!("Invalid baud rate '{}' specified.", &baud_rate)
                                 }
@@ -1082,7 +1080,7 @@ fn receive() -> glib::Continue {
                         ui.ports_dropdown.set_sensitive(false);
                         o_button.set_sensitive(false);
                     } else {
-                        for (i, p) in (0i32..).zip(ports.into_iter()) {
+                        for (i, p) in (0u32..).zip(ports.into_iter()) {
                             ui.ports_dropdown.append(None, &p);
                             ui.ports_map.insert(p, i);
                         }
@@ -1159,7 +1157,7 @@ fn receive() -> glib::Continue {
                         ui.ports_dropdown.set_sensitive(false);
                         o_button.set_sensitive(false);
                     } else {
-                        for (i, p) in (0i32..).zip(ports.into_iter()) {
+                        for (i, p) in (0u32..).zip(ports.into_iter()) {
                             ui.ports_dropdown.append(None, &p);
                             ui.ports_map.insert(p, i);
                         }
@@ -1228,7 +1226,7 @@ fn receive() -> glib::Continue {
                         } else {
                             ports.iter()
                                  .enumerate()
-                                 .map(|t| ui.ports_map[t.1] != t.0 as i32)
+                                 .map(|t| ui.ports_map[t.1] != t.0 as u32)
                                  .all(|x| x)
                         }
                     };
@@ -1236,7 +1234,7 @@ fn receive() -> glib::Continue {
                     if replace {
                         // First save whichever the currently-selected port is
                         let current_port = {
-                            let active_port = ui.ports_dropdown.get_active();
+                            let active_port = ui.ports_dropdown.get_active().unwrap_or(0);
                             let mut n = None;
                             for (p, i) in &ui.ports_map {
                                 if *i == active_port {
@@ -1254,7 +1252,7 @@ fn receive() -> glib::Continue {
                             ui.ports_dropdown.set_sensitive(false);
                             o_button.set_sensitive(false);
                         } else {
-                            for (i, p) in (0i32..).zip(ports.into_iter()) {
+                            for (i, p) in (0u32..).zip(ports.into_iter()) {
                                 ui.ports_dropdown.append(None, &p);
                                 ui.ports_map.insert(p, i);
                             }
