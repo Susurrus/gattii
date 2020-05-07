@@ -1261,7 +1261,7 @@ fn receive() -> glib::Continue {
                         }
                         signal_handler_block(&ui.ports_dropdown, &ui.ports_dropdown_changed_signal);
                         if let Some(p) = current_port {
-                            ui.ports_dropdown.set_active(ui.ports_map[&p]);
+                            ui.ports_dropdown.set_active(*ui.ports_map.get(&p).unwrap_or(&0));
                         } else {
                             ui.ports_dropdown.set_active(0);
                         }
