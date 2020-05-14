@@ -94,7 +94,7 @@ impl SerialThread {
         // listening for various port-related commands, but is not necessarily always connected to
         // the port.
         thread::spawn(move || {
-            let mut port: Option<Box<SerialPort>> = None;
+            let mut port: Option<Box<dyn SerialPort>> = None;
             let mut read_file: Option<Box<File>> = None;
             let mut bytes_read = 0u64;
             let mut bytes_total = 0u64;
